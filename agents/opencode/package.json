@@ -16,6 +16,9 @@
   "files": [
     "plugin/"
   ],
+  "dependencies": {
+    "@dibs.ai/dibs": "workspace:*"
+  },
   "peerDependencies": {
     "@opencode/plugin": "latest",
     "@opentui/core": ">=0.6.6",

@@ -2,13 +2,11 @@
 // Live dibs task panel for opencode. API per https://opencode.ai/docs/build/plugins/cli
 import { Plugin } from "@opencode/plugin/tui"
 import { createSignal, For, Show, onCleanup } from "solid-js"
-import { execFile } from "node:child_process"
+import { glyph, panel as panelOf, views, type Panel } from "@dibs.ai/dibs/core/panel.ts"
+import { findRoot, settings, storeFile } from "@dibs.ai/dibs/core/store.ts"
+import { runFile } from "@dibs.ai/dibs/core/tasks.ts"
+import type { Ctx } from "@dibs.ai/dibs/core/ctx.ts"
 
-type Row = { id: string; name: string; state: "done" | "started" | "open" }
-type P = { title: string; rows: Row[]; more: number; empty: string | null }
-const views = ["current", "project", "completed"] as const
-let npx = false // set once `dibs` is not on PATH, so later polls skip it
-const GLYPH = { done: "✓", started: "◐", open: "○" }
 // U: theme token names beyond text.base are undocumented, so plain hex colours.
 const COLOR = { done: "#5faf5f", started: "#d7af00", open: "#808080" }
 
@@ -17,19 +15,15 @@ export default Plugin.define({
 	setup(context) {
 		const [view, setView] = createSignal<(typeof views)[number]>("current")
 		const [collapsed, setCollapsed] = createSignal(false)
-		const [panel, setPanel] = createSignal<P | null>(null)
+		const [panel, setPanel] = createSignal<Panel | null>(null)
 		const mine = new Set<string>()
 		// U: `location` shape is undocumented; fall back to the process cwd.
 		const cwd = (context.location as any)?.directory ?? process.cwd()
 
-		const refresh = (): void => {
-			const args = ["panel", view(), "--json", ...(mine.size ? ["--mine", [...mine].join(",")] : [])]
-			const show = (err: any, out: string) => {
-				if (err) return setPanel(null) // fail silently
-				try { setPanel(JSON.parse(out)) } catch { setPanel(null) }
-			}
-			if (npx) { execFile("npx", ["-y", "@dibs.ai/dibs", ...args], { cwd }, show); return }
-			execFile("dibs", args, { cwd }, (err, out) => (err?.code === "ENOENT" ? ((npx = true), refresh()) : show(err, out)))
+		// Same trust and temp-store rules as the CLI; the panel only lists, so it never needs exec.
+		const ctx: Ctx = { cwd, trusted: () => process.env.DIBS_TRUST === "1" || !!findRoot(cwd), sessionId: () => process.env.DIBS_SESSION ?? cwd, exec: async () => ({ stdout: "", stderr: "not available in the opencode panel", code: 127 }) }
+		const refresh = async (): Promise<void> => {
+			try { setPanel(panelOf(JSON.parse(await runFile(storeFile(ctx, settings(ctx)), ["list"])), view(), mine)) } catch { setPanel(null) }
 		}
 
 		// U: server-event payload shape is not documented. Look for any {tool, input} object whose tool
@@ -51,10 +45,10 @@ export default Plugin.define({
 			if (full && /todo_(edit|status)$/.test(hit.tool)) mine.add(full)
 			else if (full && /todo_create$/.test(hit.tool) && parent && mine.has(parent)) mine.add(full)
 			clearTimeout(timer)
-			timer = setTimeout(refresh, 200)
+			timer = setTimeout(() => void refresh(), 200)
 		})
 
-		const cycle = () => { setView(views[(views.indexOf(view()) + 1) % views.length]); refresh() }
+		const cycle = () => { setView(views[(views.indexOf(view()) + 1) % views.length]); void refresh() }
 		const toggle = () => setCollapsed(!collapsed())
 		// Same keys as the Pi panel; also in the command palette and as slash commands.
 		// U: ctrl+shift+* may not reach the app in terminals without kitty keyboard protocol.
@@ -70,8 +64,8 @@ export default Plugin.define({
 		context.ui.slot({
 			append: "session.composer.top",
 			render: () => {
-				refresh()
-				const poll = setInterval(refresh, 3000)
+				void refresh()
+				const poll = setInterval(() => void refresh(), 3000)
 				onCleanup(() => clearInterval(poll))
 				return (
 					<Show when={panel()}>
@@ -79,7 +73,7 @@ export default Plugin.define({
 							<box flexDirection="column">
 								<text fg="#5fafd7">{`● ${p().title}  ctrl+shift+v: view`}</text>
 								<Show when={!collapsed()} fallback={<text fg="#808080">  ctrl+shift+t to expand</text>}>
-									<For each={p().rows}>{(r) => <text fg={COLOR[r.state]}>{`  ${GLYPH[r.state]} #${r.id} ${r.name}`}</text>}</For>
+									<For each={p().rows}>{(r) => <text fg={COLOR[r.state]}>{`  ${glyph[r.state]} #${r.id} ${r.name}`}</text>}</For>
 									<Show when={p().more > 0}><text fg="#808080">{`  +${p().more} more`}</text></Show>
 									<Show when={p().empty}><text fg="#808080">{`  ${p().empty}`}</text></Show>
 								</Show>

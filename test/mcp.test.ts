@@ -15,9 +15,12 @@ test("mcp server exposes the six task tools", async () => {
 	try {
 		expect(client.getServerVersion()?.version).toBe(JSON.parse(readFileSync(join(import.meta.dirname, "../package.json"), "utf8")).version);
 		const text = (r: any) => r.content[0].text as string;
-		expect((await client.listTools()).tools.map((t) => t.name).sort()).toEqual(["todo_create", "todo_edit", "todo_link", "todo_list", "todo_resolve", "todo_status"]);
+		expect((await client.listTools()).tools.map((t) => t.name).sort()).toEqual(["todo_create", "todo_edit", "todo_link", "todo_list", "todo_panel", "todo_resolve", "todo_status"]);
 		const created = text(await client.callTool({ name: "todo_create", arguments: { name: "mcp thing", description: "" } }));
 		const id = /Created task (\S+)/.exec(created)![1];
+		const pan = JSON.parse(text(await client.callTool({ name: "todo_panel", arguments: { view: "project" } })));
+		expect(pan.title).toMatch(/^Project tasks \(/);
+		expect(JSON.stringify(pan.rows)).toContain("mcp thing");
 		expect(text(await client.callTool({ name: "todo_list", arguments: {} }))).toContain("mcp thing");
 		expect((await client.callTool({ name: "todo_status", arguments: { id, status: "completed" } })).isError).toBeFalsy();
 		expect((await client.callTool({ name: "todo_edit", arguments: { id } })).isError).toBe(true);

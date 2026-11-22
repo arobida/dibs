@@ -6,6 +6,7 @@ import { link, resolveLink, settings, storeFile, version } from "../core/store.t
 import { agentName, ghUser } from "../core/identity.ts";
 import { runFile } from "../core/tasks.ts";
 import { syncAll } from "../core/adapters/sync-all.ts";
+import { panel } from "../core/panel.ts";
 import type { Ctx } from "../core/ctx.ts";
 
 export async function serveMcp(ctx: Ctx) {
@@ -61,6 +62,18 @@ tool("todo_status", "Start or complete a task. Starting claims it for this sessi
 });
 tool("todo_link", "Get a Markdown dibs:// link to a task, for use in notes or other projects.", { id: Id });
 tool("todo_resolve", "Read the task behind a dibs:// link, from any project.", { url: z.string().describe("A dibs://<project-id>/<task-id> link") });
+server.registerTool("todo_panel", {
+	description: "Task panel rows for agent UIs (JSON). Not for answering the user: use todo_list.",
+	inputSchema: {
+		view: z.enum(["current", "project", "completed"]).optional().describe("Panel view; default current"),
+		mine: z.array(z.string()).optional().describe("Full ids of tasks this session touched"),
+	},
+}, async ({ view, mine }: any) => {
+	try {
+		const tasks = JSON.parse(await runFile(storeFile(ctx, settings(ctx)), ["list"]));
+		return { content: [{ type: "text" as const, text: JSON.stringify(panel(tasks, view ?? "current", new Set(mine ?? []))) }] };
+	} catch (e: any) { return { content: [{ type: "text" as const, text: e.message ?? String(e) }], isError: true }; }
+});
 
 await server.connect(new StdioServerTransport());
 }

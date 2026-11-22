@@ -13,36 +13,26 @@ const glyph = { done: '✓', started: '◐', open: '○' } as const
 const color = { done: 'green', started: 'yellow', open: undefined } as const
 
 let last = ''
-let path = ''
-let launcher: 'dibs' | 'npx' | undefined // the first launcher that ran; later polls skip the ones that don't exist
-
-// The hooks worker may lack the user's PATH (e.g. ~/.bun/bin for dibs and bun), so read it from their shell once.
-async function userPath($: EngineInterface) {
-  if (path) return path
-  const r = await $.process.run(['/bin/sh', '-c', '${SHELL:-/bin/sh} -lic \'printf "\\n%s" "$PATH"\' 2>/dev/null'])
-  path = r.stdout.trim().split('\n').pop() ?? ''
-  return path
-}
+let server: string | undefined // the name /mcp lists this plugin's dibs server under
 
 async function refresh($: EngineInterface) {
   const v = await read($, view)
   const ids = await read($, mine)
-  const args = ['panel', v, '--json', ...(ids.length ? ['--mine', ids.join(',')] : [])]
-  const pth = await userPath($)
-  const cmd = { dibs: ['dibs', ...args], npx: ['npx', '-y', '@dibs.ai/dibs', ...args] }
   try {
-    let r = { exitCode: 127, stdout: '' }
-    for (const k of launcher ? [launcher] : (['dibs', 'npx'] as const)) {
-      r = await $.process.run(pth ? ['/usr/bin/env', `PATH=${pth}`, ...cmd[k]] : cmd[k])
-      if (r.exitCode !== 127) { launcher = k; break }
+    if (!server) {
+      const c = await $.mcp.connect('dibs')
+      if (!c.isConnected) throw new Error(c.message)
+      server = c.server
     }
-    const { exitCode, stdout } = r
-    if (exitCode !== 0) throw new Error('dibs failed')
-    if (stdout === last) return
-    const p = JSON.parse(stdout) as Panel
-    last = stdout
+    const r = await $.mcp.call(server, 'todo_panel', { view: v, mine: ids })
+    const text = r.content?.find((c: any) => c.type === 'text')?.text
+    if (r.isError || typeof text !== 'string') throw new Error('dibs failed')
+    if (text === last) return
+    const p = JSON.parse(text) as Panel
+    last = text
     await update($, panel, () => p)
   } catch {
+    server = undefined
     last = ''
     await update($, panel, () => null)
   }
@@ -60,6 +50,9 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // The panel's own tool: the model uses todo_list instead.
+  on('tool.offer', async ($, e, next) => (/dibs.*__todo_panel$/.test(e.tool) ? { isOffered: false } : next(e)))
+
   on('tool.call', async ($, e, next) => {
     const name: string = e.tool
     const res = await next(e)
@@ -73,7 +66,7 @@ export const register: Register = on => {
       if (full && (!/todo_create$/.test(name) || (parent && ids.includes(parent))))
         await update($, mine, m => (m.includes(full) ? m : [...m, full]))
     }
-    if (name.includes('todo_')) await refresh($)
+    if (name.includes('todo_') && !name.endsWith('todo_panel')) await refresh($) // the panel's own call needs no second refresh
     return res
   })
 

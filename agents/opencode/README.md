@@ -30,12 +30,14 @@ The MCP server runs the CLI through `npx -y`. Add this to `opencode.json`:
 
 ## Task panel
 
-A live task panel (views `current`/`project`/`completed`, like the Pi panel) shown above the prompt. It is a TUI-only plugin, so add it to `cli.json` (docs: https://opencode.ai/docs/cli/plugins):
+A live task panel (views `current`/`project`/`completed`, like the Pi panel) appears above the prompt in a session view. It does not show on the start screen. The panel refreshes every 3 seconds.
+
+The panel is a TUI-only plugin, so add it to `cli.json` (docs: https://opencode.ai/docs/cli/plugins):
 
 ```json
-{ "plugins": ["/absolute/path/to/dibs/agents/opencode/plugin/tui.tsx"] }
+{ "plugins": ["/absolute/path/to/dibs/agents/opencode"] }
 ```
 
-Local plugin entries are documented as directories or package names; if the file path is rejected, point at `/absolute/path/to/dibs/agents/opencode` (its `package.json` exports `./tui`). Install peers there first: `cd agents/opencode && nub add @opencode/plugin @opentui/core @opentui/solid solid-js`.
+opencode 2.3.2 loads the directory entry (its `package.json` exports `./tui`) and ignores a path to `plugin/tui.tsx`. From a checkout, run `nub install` at the repo root, which links the `@dibs.ai/dibs` dependency, then install the peers: `cd agents/opencode && nub add @opencode/plugin @opentui/core @opentui/solid solid-js`.
 
-Keys: `ctrl+shift+v` cycles the view, `ctrl+shift+t` collapses (also `/tasks-view`, `/tasks-toggle`, and the command palette). The panel refreshes every 3 s and after any event mentioning a `todo_*` tool. It runs `dibs` when it is on your PATH and falls back to `npx -y @dibs.ai/dibs`. Not verified against a running opencode.
+Keys: `ctrl+shift+v` cycles the view, `ctrl+shift+t` collapses (also `/tasks-view`, `/tasks-toggle`, and the command palette). The panel also refreshes after any event mentioning a `todo_*` tool. It reads the store in-process with the dibs core (`@dibs.ai/dibs`, a dependency in `agents/opencode/package.json`), using the same trust rules as the CLI: `DIBS_TRUST=1` or a folder with `.dibs/`. It does not run `dibs` or `npx`. `nub run test:ui` checks the panel, `/tasks-view` and the refresh on opencode 2.3.2; the `ctrl+shift` keys are not tested.

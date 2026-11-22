@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Claude Code task panel reads tasks through the plugin's MCP server, not a login shell and the dibs CLI. The shell made Claude Code exit at startup for zsh users whose startup files take about a second.
+
+- MCP tool `todo_panel`: the task panel as JSON for agent UIs, without an adapter sync. The Claude Code plugin keeps it from the model.
+
+- opencode task panel reads the store in-process with the dibs core, not by running the dibs CLI.
+
+- opencode README: `cli.json` points at the `agents/opencode` directory; opencode 2.3.2 ignores a path to `plugin/tui.tsx`.
+
+- `nub run test:ui`: a Rex-driven UI test for the Pi, Claude Code and opencode task panels.
+
 - Find the project from any subfolder: the CLI walks up to the nearest folder with `.dibs/`, `.agents/dibs/` or `.pi-do/`, never the home folder or `~/.dibs`.
 
 - Untrusted folders keep one temp store per folder (`DIBS_SESSION` overrides the key), so tasks persist across CLI calls in the same folder.

@@ -39,6 +39,9 @@ importers:
 
   agents/opencode:
     dependencies:
+      '@dibs.ai/dibs':
+        specifier: workspace:*
+        version: 0.1.6
       '@opencode/plugin':
         specifier: latest
         version: 2.3.2(@opentelemetry/semantic-conventions@1.45.0)(@opentui/core@0.9.4(web-tree-sitter@0.25.10))(@opentui/solid@0.9.4(solid-js@2.0.3))(redis@6.3.1)(solid-js@2.0.3)(typescript@7.0.2)(vite@8.3.8(@types/node@26.6.6)(jiti@2.7.0)(yaml@2.9.0))
@@ -56,7 +59,7 @@ importers:
     dependencies:
       '@dibs.ai/dibs':
         specifier: workspace:*
-        version: 0.1.3
+        version: 0.1.6
 
 packages:
 

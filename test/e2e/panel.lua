@@ -2,6 +2,7 @@
 -- Usage: nub run test:ui   (builds first), or: rex do test/e2e/panel.lua [agent=pi|claude|opencode]
 -- Needs Rex and the agent CLIs on PATH.
 -- No prompts are sent, so no model tokens are spent; only the panel UI is exercised.
+-- Claude's panel reads tasks through the plugin's MCP server; the other panels read this checkout's core directly.
 local TERM = "com.superlogical.terminal"
 local SID -- the throwaway session; block calls default to the caller's session otherwise
 
@@ -13,9 +14,6 @@ local function sh(argv, opts)
 end
 
 local root = sh({ "git", "rev-parse", "--show-toplevel" })
--- The user's interactive PATH (rc files add e.g. ~/.opencode/bin). Running agents under "zsh -ic"
--- instead gets Claude Code stopped by SIGTTIN, so read it once and run agents under plain sh.
-local user_path = sh({ os.getenv("SHELL") or "sh", "-ic", 'printf "\n%s" "$PATH"' }):match("([^\n]*)$")
 
 -- Each agent: how to start it with the local plugin, the slash command that switches to the project view, and whether the panel reloads on its own.
 local agents = {
@@ -30,9 +28,17 @@ local agents = {
     --   mkdir -p ~/.cache/dibs-ui/claude && cd ~/.cache/dibs-ui/claude && claude   (accept, then /exit)
     dir = os.getenv("HOME") .. "/.cache/dibs-ui/claude",
     fail = { ["Yes, I trust this folder"] = "untrusted folder: trust ~/.cache/dibs-ui/claude once (see test/e2e/panel.lua)" },
-    cmd = 'exec claude --plugin-dir "$ROOT/dist/claude-code"',
+    setup = function(dir)
+      sh({ "cp", "-R", root .. "/dist/claude-code", dir .. "/plugin" })
+      -- The published .mcp.json runs npx; the test runs this checkout's CLI through the shim, so shim.log proves it.
+      local f = assert(io.open(dir .. "/plugin/.mcp.json", "w"))
+      f:write(rex.json.encode({ mcpServers = { dibs = { command = dir .. "/bin/dibs", args = { "mcp" } } } }))
+      f:close()
+    end,
+    cmd = 'exec claude --plugin-dir "$DIR/plugin"',
     project = "/todos project",
     live = true, -- polls every 3 s
+    cli = true, -- the MCP server's "mcp" call lands in shim.log
   },
   opencode = {
     -- A private config dir so the test never edits the user's cli.json.
@@ -48,7 +54,7 @@ local agents = {
     -- The panel lives in the session view's composer; a "!" shell command opens a session without the model.
     open = { ready = "Ask anything", line = "!echo dibs-ui" },
     project = "/tasks-view", -- cycles current -> project
-    live = false, -- refreshes only on todo_ tool calls and commands
+    live = true, -- the panel imports the dibs core from this checkout through the workspace link
   },
 }
 
@@ -81,20 +87,22 @@ local function expect(block_id, needles, timeout, fail)
   error({ want = needles, screen = s }, 0)
 end
 
-local function run(name, a, sid)
-  local dir = a.dir or sh({ "mktemp", "-d", "/tmp/dibs-ui.XXXXXX" })
-  if a.dir then sh({ "rm", "-rf", dir }); sh({ "mkdir", "-p", dir }) end
+local function run_body(name, a, sid)
+  if a.dir then sh({ "mkdir", "-p", a.dir }) end
+  local dir = sh({ "mktemp", "-d", (a.dir or "/tmp") .. "/dibs-ui.XXXXXX" })
   -- "dibs" on PATH is this checkout, so CLI-driven panels test local code, not npm.
   sh({ "mkdir", dir .. "/bin" })
   local shim = assert(io.open(dir .. "/bin/dibs", "w"))
-  shim:write('#!/bin/sh\nexec node "' .. root .. '/lib/cli/index.js" "$@"\n')
+  shim:write('#!/bin/sh\necho "$*" >> "' .. dir .. '/shim.log"\nexec node "' .. root .. '/lib/cli/index.js" "$@"\n')
   shim:close()
   sh({ "chmod", "+x", dir .. "/bin/dibs" })
   -- DIBS_HOME keeps the user's global store and adapters (Dex, Things) out of the test.
   local env = { DIBS_TRUST = "1", DIBS_AGENT = "ui-test", DIBS_HOME = dir .. "/home" }
   sh({ dir .. "/bin/dibs", "create", "seed task alpha" }, { cwd = dir, env = env })
+  os.remove(dir .. "/shim.log")
   if a.setup then a.setup(dir) end
 
+  -- rex do runs from the user's terminal, so its PATH is the interactive one.
   local w, err = rex.session.new_window {
     session_id = sid,
     window_label = name,
@@ -102,7 +110,7 @@ local function run(name, a, sid)
       flavor = TERM .. ".shell",
       options = {
         cwd = dir,
-        command = { "sh", "-c", 'export ROOT="$1" DIR="$2" PATH="$2/bin:$3" DIBS_HOME="$2/home"; ' .. a.cmd, "sh", root, dir, user_path },
+        command = { "sh", "-c", 'export ROOT="$1" DIR="$2" PATH="$2/bin:$3" DIBS_HOME="$2/home"; ' .. a.cmd, "sh", root, dir, os.getenv("PATH") },
         exit = { on_completion = false },
       },
     },
@@ -117,6 +125,12 @@ local function run(name, a, sid)
       type_line(b, a.open.line)
     end
     expect(b, { "Current tasks", "No tasks worked on in this session yet" }, 60, a.fail)
+    if a.cli then
+      local f = io.open(dir .. "/shim.log")
+      local log = f and f:read("*a") or ""
+      if f then f:close() end
+      if log == "" then error({ error = "the panel never ran this checkout's dibs (shim.log empty)" }, 0) end
+    end
     step = "switch to project view"
     type_line(b, a.project)
     -- A new store starts with the onboarding "Hello World" task, hence 2.
@@ -133,6 +147,19 @@ local function run(name, a, sid)
   if type(e) ~= "table" then e = { error = tostring(e) } end
   e.agent, e.ok, e.step = name, false, step
   return e
+end
+
+-- A fixed folder (a.dir) is shared between runs, so take a lock on it first.
+local function run(name, a, sid)
+  if a.dir then
+    rex.exec({ "mkdir", "-p", a.dir:match("^(.*)/[^/]+$") })
+    local r = rex.exec({ "mkdir", a.dir .. ".lock" })
+    if not r or not r.ok then error("another test:ui run holds " .. a.dir .. ".lock", 0) end
+  end
+  local ok, res = pcall(run_body, name, a, sid)
+  if a.dir then rex.exec({ "rmdir", a.dir .. ".lock" }) end
+  if not ok then error(res, 0) end
+  return res
 end
 
 local names = rex.args.agent and { rex.args.agent } or { "pi", "claude", "opencode" }

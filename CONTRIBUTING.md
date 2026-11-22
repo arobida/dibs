@@ -52,6 +52,25 @@ Generate a codebase summary for agents with `nubx repomix --ignore "node_modules
 
 The package is MIT licensed (see `LICENSE`), and contributions fall under the same license.
 
+## UI tests
+
+`nub run test:ui` builds the core and the Claude Code plugin, then runs `test/e2e/panel.lua` with `rex do`. The script opens a throwaway Rex session. For Pi, Claude Code and opencode, it starts the agent with this checkout's plugin, checks that the task panel shows, switches to the project view, and checks that a task added from the CLI appears. The test sends no prompts, so it uses no model tokens.
+
+`nub run test:ui` is not part of `nub run test`. It needs:
+
+- Rex. Run the test from a Rex terminal.
+- `pi`, `claude` and `opencode` on `PATH`, each signed in.
+
+Claude Code loads plugin modules only in a trusted folder. Trust the test folder once:
+
+```sh
+mkdir -p ~/.cache/dibs-ui/claude && cd ~/.cache/dibs-ui/claude && claude
+```
+
+Accept the trust prompt, then run `/exit`.
+
+To test one agent, run `rex do test/e2e/panel.lua agent=pi|claude|opencode`. Runs share the Claude Code folder, so a second run started during the first stops with a lock error.
+
 ## Releasing
 
 ```sh
