@@ -35,6 +35,7 @@
   ],
   "scripts": {
     "test": "vitest run",
+    "test:ui": "nub run build && nub run build:agent claude-code && rex do test/e2e/panel.lua",
     "build": "tsc -p tsconfig.build.json",
     "prepare": "nub run build",
     "check": "tsc && vitest run",
