@@ -3,9 +3,10 @@ import { Text, truncateToWidth, type TUI } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { existsSync, mkdirSync, watch, type FSWatcher, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { checkName, type Task } from "@dibs.ai/dibs/core/todo.ts";
+import { type Task } from "@dibs.ai/dibs/core/todo.ts";
 import { home } from "@dibs.ai/dibs/core/util.ts";
 import { link, migrate, resolveLink, setScope, settings, storeFile } from "@dibs.ai/dibs/core/store.ts";
+import { toolArgs } from "@dibs.ai/dibs/core/tools.ts";
 import { runFile } from "@dibs.ai/dibs/core/tasks.ts";
 import { dexWatchDirs } from "@dibs.ai/dibs/core/adapters/dex/index.ts";
 import { ghUser } from "@dibs.ai/dibs/core/identity.ts";
@@ -67,7 +68,7 @@ export default function taskPanel(pi: ExtensionAPI) {
 
 	async function refresh(ctx: ExtensionContext) {
 		// The panel reads the store as-is: mutations already synced, and remote edits arrive via explicit list or watchers.
-		const data = JSON.parse(await runFile(storeFile(toCtx(pi, ctx), settings(toCtx(pi, ctx))), ["list", "--all", "--json"]));
+		const data = JSON.parse(await runFile(storeFile(toCtx(pi, ctx), settings(toCtx(pi, ctx))), ["list"]));
 		if (!Array.isArray(data)) throw new Error("Invalid task list");
 		tasks = data;
 		if (!ctx.hasUI) return;
@@ -79,26 +80,16 @@ export default function taskPanel(pi: ExtensionAPI) {
 
 	// One shared runner behind six small tools, so each schema marks exactly the fields its action needs.
 	async function act(action: string, p: Record<string, any>, signal: AbortSignal | undefined, ctx: ExtensionContext) {
-		// Models fill unused fields with "" or null; treat both as not given.
-		for (const k of Object.keys(p)) if (p[k] === "" || p[k] === null) delete p[k];
-		const { id, name, description, parent, result, url, force, query } = p;
-		const human = p.human === "me" ? await ghUser(toCtx(pi, ctx)) ?? "" : p.human;
-		const blocked_by = Array.isArray(p.blocked_by) ? p.blocked_by.join(",") : p.blocked_by;
-		if (action === "link") return link(toCtx(pi, ctx), id);
-		if (action === "resolve") return resolveLink(url);
-		if (action === "edit" && name === undefined && description === undefined && blocked_by === undefined && human === undefined) throw new Error("todo_edit needs at least one of name, description, blocked_by, human");
-		if (name !== undefined) checkName(name);
-		let args: string[];
-		if (action === "list") args = [...(p.ready ? ["ready"] : ["list", ...(query?.trim() ? ["--query", query] : [])]), ...(human ? ["--human", human] : [])];
-		else if (action === "create") args = ["create", name, ...(description !== undefined ? ["--description", description] : []), ...(parent ? ["--parent", parent] : []), ...(blocked_by !== undefined ? ["--blocked-by", blocked_by] : []), "--created-by", "pi", "--human", await ghUser(toCtx(pi, ctx)) ?? ""];
-		else if (action === "edit") args = ["edit", id, ...(name !== undefined ? ["--name", name] : []), ...(description !== undefined ? ["--description", description] : []), ...(blocked_by !== undefined ? ["--blocked-by", blocked_by] : []), ...(human !== undefined ? ["--human", human] : [])];
-		else if (p.status === "completed") args = ["complete", id, "--result", result || "Completed", "--claim", claim(ctx), "--no-commit"];
-		else if (result !== undefined) throw new Error("result is only for status completed");
-		else args = ["start", id, "--claim", claim(ctx)];
-		if (force && action === "status") args.push("--force");
+		if (action === "link") return link(toCtx(pi, ctx), p.id);
+		if (action === "resolve") return resolveLink(p.url);
+		const args = await toolArgs(action, p, { creator: "pi", claim: claim(ctx), user: () => ghUser(toCtx(pi, ctx)) });
 		const output = await run(ctx, args, signal);
-		if (id) track(id);
-		else if (action === "create" && parent && mine.has(parent)) { const m = output.match(/Created task (\S+)/); if (m) track(m[1]); }
+		// Track the full id from the reply: the call may have used a short prefix.
+		if (action !== "list") {
+			const full = output.match(/task (\S+) "/)?.[1];
+			const par = output.match(/; parent ([^\s;]+)/)?.[1];
+			if (full && (action !== "create" || (par && mine.has(par)))) track(full);
+		}
 		// The change is already saved; a failed reload must not make the agent retry it.
 		try { await refresh(ctx); } catch (error) { if (ctx.hasUI) ctx.ui.notify(`Tasks: ${error}`, "error"); }
 		return output;
@@ -155,7 +146,7 @@ export default function taskPanel(pi: ExtensionAPI) {
 				if (conn) { ctx.ui.notify(saveThingsToken(conn[1]), "info"); await refresh(ctx); return; }
 				const mig = want.match(/^migrate\s+(\.dibs|\.agents\/dibs)$/);
 				const sc = want.match(/^scope\s+(project|global)$/);
-				if (mig || sc) { ctx.ui.notify(mig ? migrate(toCtx(pi, ctx), mig[1]) : setScope(toCtx(pi, ctx), sc![1]), "info"); void watchStore(ctx); await refresh(ctx); return; }
+				if (mig || sc) { ctx.ui.notify(mig ? migrate(toCtx(pi, ctx), mig[1]) : await setScope(toCtx(pi, ctx), sc![1]), "info"); void watchStore(ctx); await refresh(ctx); return; }
 				const io = want.match(/^(export|import)\s+(.+)$/);
 				if (io) {
 					const path = resolve(ctx.cwd, home(io[2].trim()));
@@ -200,7 +191,7 @@ export default function taskPanel(pi: ExtensionAPI) {
 	}
 	pi.on("session_shutdown", async (_event, ctx) => { unwatch(); try { await runFile(storeFile(toCtx(pi, ctx), settings(toCtx(pi, ctx))), ["release", "--claim", claim(ctx)]); } catch {} });
 	pi.on("session_start", async (_event, ctx) => { void watchStore(ctx); restore(ctx); try { await refresh(ctx); } catch (error) { if (ctx.hasUI) ctx.ui.notify(`Tasks: ${error}`, "error"); } });
-	// Pick up tasks other agents added through Dex before each prompt.
+	// Reload the store before each prompt so tasks other agents wrote show up; adapters sync on task tool calls and the Dex watcher, not here.
 	pi.on("before_agent_start", async (_event, ctx) => { try { await refresh(ctx); } catch {} });
 	pi.on("tool_result", async (event, ctx) => {
 		if (event.isError) return;

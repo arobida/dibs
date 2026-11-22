@@ -7,6 +7,7 @@ import { execFile } from "node:child_process"
 type Row = { id: string; name: string; state: "done" | "started" | "open" }
 type P = { title: string; rows: Row[]; more: number; empty: string | null }
 const views = ["current", "project", "completed"] as const
+let npx = false // set once `dibs` is not on PATH, so later polls skip it
 const GLYPH = { done: "✓", started: "◐", open: "○" }
 // U: theme token names beyond text.base are undocumented, so plain hex colours.
 const COLOR = { done: "#5faf5f", started: "#d7af00", open: "#808080" }
@@ -21,12 +22,14 @@ export default Plugin.define({
 		// U: `location` shape is undocumented; fall back to the process cwd.
 		const cwd = (context.location as any)?.directory ?? process.cwd()
 
-		const refresh = () => {
-			const args = ["@dibs.ai/dibs", "panel", view(), "--json", ...(mine.size ? ["--mine", [...mine].join(",")] : [])]
-			execFile("npx", ["-y", ...args], { cwd }, (err, out) => {
+		const refresh = (): void => {
+			const args = ["panel", view(), "--json", ...(mine.size ? ["--mine", [...mine].join(",")] : [])]
+			const show = (err: any, out: string) => {
 				if (err) return setPanel(null) // fail silently
 				try { setPanel(JSON.parse(out)) } catch { setPanel(null) }
-			})
+			}
+			if (npx) { execFile("npx", ["-y", "@dibs.ai/dibs", ...args], { cwd }, show); return }
+			execFile("dibs", args, { cwd }, (err, out) => (err?.code === "ENOENT" ? ((npx = true), refresh()) : show(err, out)))
 		}
 
 		// U: server-event payload shape is not documented. Look for any {tool, input} object whose tool
@@ -40,11 +43,13 @@ export default Plugin.define({
 		const stop = context.data.listen(({ details }: any) => {
 			const hit = scan(details)
 			if (!hit) return
-			const input = hit.input ?? hit.state?.input
-			if (input?.id && /todo_(create|edit|status)$/.test(hit.tool)) mine.add(String(input.id))
-			const out = JSON.stringify(hit.output ?? hit.result ?? hit.state?.output ?? "")
-			const m = /Created task (\S+)/.exec(out)
-			if (m && input?.parent && mine.has(String(input.parent))) mine.add(m[1].replace(/\W+$/, ""))
+			// Replies carry the full id; the input id may be a short prefix.
+			const raw = hit.output ?? hit.result ?? hit.state?.output ?? ""
+			const out = typeof raw === "string" ? raw : JSON.stringify(raw)
+			const full = /task (\S+) "/.exec(out)?.[1]
+			const parent = /; parent ([^\s;]+)/.exec(out)?.[1]
+			if (full && /todo_(edit|status)$/.test(hit.tool)) mine.add(full)
+			else if (full && /todo_create$/.test(hit.tool) && parent && mine.has(parent)) mine.add(full)
 			clearTimeout(timer)
 			timer = setTimeout(refresh, 200)
 		})

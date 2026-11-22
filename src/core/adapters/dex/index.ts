@@ -57,11 +57,13 @@ export function dexAdapter(ctx: Ctx): Adapter {
 			if (task.started_at || task.completed) await this.update(id, { started_at: task.started_at, completed: task.completed, result: task.result });
 			return id;
 		},
-		// shortcut: Dex has no uncomplete/unstart or result edit on completed tasks; those changes stay local.
+		// shortcut: Dex has no uncomplete/unstart or result edit on completed tasks; those are reported as skipped so they stay local.
 		async update(id, patch) {
-			if (patch.name !== undefined || patch.description !== undefined || patch.parent !== undefined) await run(["edit", id, ...(patch.name !== undefined ? ["--name", patch.name] : []), ...(patch.description !== undefined ? ["--description", patch.description ?? ""] : []), ...(patch.parent ? ["--parent", patch.parent] : [])]);
+			const hasDesc = "description" in patch;
+			if (patch.name !== undefined || hasDesc || patch.parent !== undefined) await run(["edit", id, ...(patch.name !== undefined ? ["--name", patch.name] : []), ...(hasDesc ? ["--description", patch.description ?? ""] : []), ...(patch.parent ? ["--parent", patch.parent] : [])]);
 			if (patch.started_at && !patch.completed) await run(["start", id, "--force"]);
 			if (patch.completed) await run(["complete", id, "--result", patch.result || "done", "--no-commit", "--force"]);
+			return ([["parent", "parent" in patch && !patch.parent], ["started_at", "started_at" in patch && !patch.started_at], ["completed", patch.completed === false], ["result", "result" in patch && !patch.completed]] as const).filter(([, s]) => s).map(([f]) => f);
 		},
 	};
 }

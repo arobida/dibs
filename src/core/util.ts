@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { linkSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -24,15 +24,20 @@ export async function withLock<T>(file: string, fn: () => T | Promise<T>, tries 
 				pid = /^(\d+):./.test(seen) ? Number(seen.split(":")[0]) : undefined;
 				// an empty or malformed lock may be mid-write: stale only once it is 5s old.
 				if (pid === undefined ? Date.now() - statSync(lock).mtimeMs > 5_000 : !isAlive(pid)) {
-					// rename is atomic, so one waiter wins; if it moved a new holder's lock, put it back.
-					const stale = `${lock}.${randomUUID()}.stale`;
-					renameSync(lock, stale);
-					try { if (readFileSync(stale, "utf8") !== seen) linkSync(stale, lock); } catch {}
-					try { unlinkSync(stale); } catch {}
-					continue;
+					// shortcut: a takeover holder dying between its read and unlink, plus a stale takeover, is not covered; use OS file locks if that shows up.
+					const takeover = `${lock}.takeover`;
+					try {
+						writeFileSync(takeover, mine, { flag: "wx" });
+						try { if (readFileSync(lock, "utf8") === seen) unlinkSync(lock); } catch {}
+						finally { try { unlinkSync(takeover); } catch {} }
+						continue;
+					} catch (e: any) {
+						if (e.code !== "EEXIST") throw e;
+						if (Date.now() - statSync(takeover).mtimeMs > 5_000) { try { unlinkSync(takeover); } catch {} continue; }
+					}
 				}
 			} catch {}
-			if (i >= tries) throw new Error(`Task file is locked: ${lock} (held by pid ${pid ?? "unknown"}). If that pid is not a dibs process, delete the file.`);
+			if (i >= tries) throw Object.assign(new Error(`Task file is locked: ${lock} (held by pid ${pid ?? "unknown"}). If that pid is not a dibs process, delete the file.`), { code: "ELOCKED", lock });
 			await new Promise((r) => setTimeout(r, 25));
 		}
 	}

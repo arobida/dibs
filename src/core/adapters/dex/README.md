@@ -25,7 +25,7 @@ To disconnect, set `"sync": false` or remove the entry. Tasks already synced sta
 | Started | yes | yes |
 | Completed + result | yes | yes |
 
-- Two-way: each list or change in dibs syncs both ways. dibs pulls changes that other agents make in Dex when Dex's storage folder changes (file storage engine only) and before each prompt.
+- Two-way, on the schedule in the [main README](../../../../README.md#adapters). Pi also syncs when Dex's storage folder changes (file storage engine only), so changes other agents make in Dex show up without a dibs action.
 - Conflicts: per field, a change on one side since the last sync is copied across. If both sides changed the same field, dibs wins.
 - State: links and last-synced copies live in `sync/dex.jsonl` next to the store's `config.json`.
 - Completing in Dex uses `--no-commit --force`.
@@ -33,8 +33,7 @@ To disconnect, set `"sync": false` or remove the entry. Tasks already synced sta
 ## Limitations
 
 - Deletions are never propagated in either direction.
-- Dex cannot un-complete or un-start a task, or change a completed task's result; those changes stay in dibs only.
-- Clearing a description in dibs does not clear it in Dex.
+- Dex cannot un-complete or un-start a task, remove a parent, or change a completed task's result. The adapter reports those changes as skipped, so they stay in dibs and the next sync does not pull the old value back.
 - Not synced: Dex's numeric priority, blockers (`blockedBy`/`blocks`), linked commits, metadata, archived tasks, and GitHub/Shortcut sync.
-- Dex storage outside the file engine (no local folder) re-syncs only on dibs actions and before each prompt, not live.
-- A sync failure shows as a notice and does not block the local change. dibs retries on the next sync.
+- Dex storage outside the file engine (no local folder) syncs only on dibs actions, not live.
+- A sync failure does not block the local change: Pi shows a notice, the MCP server logs to stderr, and `dibs sync` exits 1. dibs retries on the next sync.

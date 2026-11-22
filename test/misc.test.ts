@@ -81,14 +81,14 @@ test("two waiters on a dead lock never overlap", async () => {
 	expect(log[3]).toBe(log[2].replace("+", "-"));
 });
 
-test("takeover restores a lock a new holder took mid-rename and does not run fn", async () => {
+test("takeover leaves a lock a new holder took mid-takeover and does not run fn", async () => {
 	const real = await import("node:fs");
 	const f = lockFile(), lock = `${f}.lock`;
 	writeFileSync(lock, `${DEAD}:x`);
-	const { renameSync, writeFileSync: write } = real; // captured: the mock replaces the live module
+	const { writeFileSync: write } = real; // captured: the mock replaces the live module
 	let armed = true;
-	// a new live holder replaces the dead lock just before the waiter's rename
-	vi.doMock("node:fs", () => ({ ...real, renameSync: (from: string, to: string) => { if (armed) { armed = false; write(lock, `${process.pid}:new`); } return renameSync(from, to); } }));
+	// a new live holder replaces the dead lock right after the waiter takes the takeover lock
+	vi.doMock("node:fs", () => ({ ...real, writeFileSync: (path: string, ...rest: any[]) => { const r = (write as any)(path, ...rest); if (armed && String(path).endsWith(".takeover")) { armed = false; write(lock, `${process.pid}:new`); } return r; } }));
 	const { withLock: locked } = await import("../src/core/util.ts" + "?restore");
 	let ran = false;
 	await expect(locked(f, () => { ran = true; }, 1)).rejects.toThrow("locked");

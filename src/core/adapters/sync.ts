@@ -12,7 +12,8 @@ export interface Adapter {
 	fields?: readonly (typeof fields)[number][];
 	list(): Promise<Task[]>;
 	create(task: Task): Promise<string>;
-	update(id: string, patch: Partial<Task>): Promise<void>;
+	// Returns the fields it could not apply; sync keeps those as pending local changes.
+	update(id: string, patch: Partial<Task>): Promise<string[] | void>;
 }
 
 // Each link remembers both ids and the task as of the last sync, so a 3-way compare tells which side changed.
@@ -26,7 +27,7 @@ const fields = ["name", "description", "completed", "started_at", "result", "par
 // Two-way sync of the dibs todos file with one adapter. Per field: only one side changed -> copy it; both -> dibs wins.
 // With `human`, only tasks whose human matches take part; the rest are left untouched.
 // Deletions are never propagated: a task missing on one side just stays unlinked.
-export async function sync(file: string, base: string, adapter: Adapter, human?: string): Promise<void> {
+export async function sync(file: string, base: string, adapter: Adapter, human?: string): Promise<"skipped" | void> {
 	const linksFile = join(base, "sync", `${adapter.name}.jsonl`);
 	mkdirSync(join(base, "sync"), { recursive: true });
 	return withLock(linksFile, async () => {
@@ -39,8 +40,9 @@ export async function sync(file: string, base: string, adapter: Adapter, human?:
 	const toRemote = new Map(links.map((l) => [l.local, l.remote])), toLocal = new Map(links.map((l) => [l.remote, l.local]));
 	const norm = (t: Task): Task => ({ id: t.id, name: t.name, completed: t.completed, started_at: t.started_at ?? null, description: t.description || undefined, parent: t.parent || undefined, result: t.result || undefined });
 	// A rejected parent is cleared ("" overrides the stored value) so one bad link doesn't abort the sync. Returns the saved record.
-	const put = async (t: Task): Promise<Task> => {
-		try { await runFile(file, ["put", JSON.stringify(t)]); } catch (e) { if (!(e instanceof ParentError)) throw e; await runFile(file, ["put", JSON.stringify({ ...t, parent: "" })]); }
+	const put = async (t: Task, expect?: object): Promise<Task> => {
+		const x = expect ? [JSON.stringify(expect)] : [];
+		try { await runFile(file, ["put", JSON.stringify(t), ...x]); } catch (e) { if (!(e instanceof ParentError)) throw e; await runFile(file, ["put", JSON.stringify({ ...t, parent: "" }), ...x]); }
 		return norm(JSON.parse(await runFile(file, ["list"]) as string).find((x: Task) => x.id === t.id));
 	};
 	// Parents first, so a child's parent is already linked when it is created.
@@ -69,13 +71,20 @@ export async function sync(file: string, base: string, adapter: Adapter, human?:
 			if (lv[f] !== b[f]) { if (lv[f] !== rv[f]) (push as Record<string, unknown>)[f] = lv[f]; }
 			else if (rv[f] !== b[f]) (pull as Record<string, unknown>)[f] = rv[f];
 		}
-		if (Object.keys(push).length) await adapter.update(r.id, { ...push, parent: push.parent && toRemote.get(push.parent), result: lv.result });
-		link.base = Object.keys(pull).length ? await put({ id: lv.id, ...Object.fromEntries(Object.entries(pull).map(([k, v]) => [k, v ?? ""])) } as Task) : { ...lv };
+		const skipped = Object.keys(push).length ? (await adapter.update(r.id, { ...push, parent: push.parent && toRemote.get(push.parent), result: lv.result })) ?? [] : [];
+		link.base = Object.keys(pull).length ? await put({ id: lv.id, ...Object.fromEntries(Object.entries(pull).map(([k, v]) => [k, v ?? ""])) } as Task, Object.fromEntries(Object.keys(pull).map((k) => [k, (lv as any)[k] ?? null]))) : { ...lv };
+		// Pull refused (local changed meanwhile): keep the old base so the next sync pushes the local value.
+		for (const k of Object.keys(pull)) if ((link.base as any)[k] !== (rv as any)[k]) (link.base as any)[k] = (b as any)[k];
+		for (const f of skipped) if (f in push) (link.base as any)[f] = (b as any)[f];
 	}
 	} finally {
 		const temp = `${linksFile}.${randomUUID()}.tmp`;
 		writeFileSync(temp, links.map((l) => JSON.stringify(l)).join("\n") + "\n");
 		renameSync(temp, linksFile);
 	}
+	}, 0).catch((e: any) => {
+		// Another process is already syncing this adapter; its run covers our changes.
+		if (e.code === "ELOCKED" && e.lock === `${linksFile}.lock`) return "skipped";
+		throw e;
 	});
 }

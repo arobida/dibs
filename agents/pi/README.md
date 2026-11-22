@@ -34,5 +34,5 @@ The panel reloads when another agent changes the store. `ctrl+shift+v` cycles th
 | `/todos export <path> [--global]` | Write todo.txt; does not overwrite an existing file |
 | `/todos import <path> [--global]` | Read todo.txt; skips `dibsid:`s already in the store |
 | `/todos connect things <token>` | Save the Things 3 token (see the [Things adapter](../../src/core/adapters/things/README.md)) |
-| `/todos scope project\|global` | Move the todos folder (see [Storage](../../README.md#storage)) |
+| `/todos scope project\|global` | Move the todos and sync folders (see [Storage](../../README.md#storage)) |
 | `/todos migrate .dibs\|.agents/dibs` | Move the project store folder |

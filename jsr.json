@@ -2,8 +2,7 @@
   "name": "@dibs/dibs",
   "version": "0.1.6",
   "exports": {
-    ".": "./src/core/tasks.ts",
-    "./cli": "./src/cli/index.ts"
+    ".": "./src/core/tasks.ts"
   },
   "publish": {
     "include": [

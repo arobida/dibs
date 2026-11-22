@@ -18,6 +18,7 @@ src/core/identity.ts    Agent name and GitHub user resolution
 src/core/util.ts        Shared helpers: ~ expansion, file lock, JSONL reader
 src/core/tasks.ts       Actions on the dibs JSONL todos file (the one store)
 src/core/panel.ts       Task panel views shared by the agents
+src/core/tools.ts       Task tool params to store actions, shared by the MCP server and Pi
 src/core/ctx.ts         Ctx: host-neutral cwd/trust/session/exec
 src/cli/index.ts        dibs CLI
 src/cli/mcp.ts          dibs mcp: task tools over MCP (stdio)

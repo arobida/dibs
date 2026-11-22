@@ -33,7 +33,7 @@ The plugin registers the MCP server. To add it without the plugin, put this in `
 
 ## Task panel
 
-A live task panel sits above the prompt. It shows the panel title, then each task as `✓`, `◐` or `○` with its id and name, `+N more` when rows are cut, or an empty-state message. It refreshes at session start, every 3 seconds, and after any `todo_` tool call. Tasks this session touched are tracked and passed to `dibs panel --mine`.
+A live task panel sits above the prompt. It shows the panel title, then each task as `✓`, `◐` or `○` with its id and name, `+N more` when rows are cut, or an empty-state message. It refreshes at session start, every 3 seconds, and after any `todo_` tool call. The panel runs `dibs` when it is on your PATH and falls back to `npx -y @dibs.ai/dibs`. Tasks this session touched are tracked by the full id in each tool reply and passed to `dibs panel --mine`.
 
 Use `/todos` to cycle views, `/todos current|project|completed` to pick one, and `/todos toggle` to collapse or expand the panel.
 

@@ -38,7 +38,8 @@ function checkBlockers(items: Task[], id: string, blockers: string[] = []) {
 		}
 	}
 }
-const live = (task: Task) => !!task.claimed_by && isAlive(Number(task.claimed_by.split(":").pop()));
+// The CLI process exits right after start, so its pid can't prove liveness; cli: claims last until complete or --force.
+const live = (task: Task) => !!task.claimed_by && (task.claimed_by.startsWith("cli:") || isAlive(Number(task.claimed_by.split(":").pop())));
 const ids = (s?: string) => (s ? s.split(",").map((x) => x.trim()).filter(Boolean) : undefined);
 // Short project-prefixed ids (like Dex/Beads) so agents copy a few characters, not a UUID.
 const prefix = (file: string) => (basename(file).replace(/\.todos\.jsonl$/, "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 4) || "task");
@@ -104,9 +105,11 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 		const task: Task = JSON.parse(value);
 		const at = items.findIndex((item) => item.id === task.id);
 		const old = items[at];
+		// Fields sync saw as unchanged-locally: skip any that changed since, so a slow pull can't clobber a newer local edit.
+		if (args[2] && old) for (const [k, v] of Object.entries(JSON.parse(args[2]))) if (JSON.stringify((old as any)[k] ?? null) !== JSON.stringify(v)) delete (task as any)[k];
 		// Partial merge: a stale snapshot only overwrites the fields it carries ("" clears one); todo.txt-only fields stay.
 		const merged: any = { ...old, ...task };
-		merged.started_at ??= null;
+		merged.started_at ||= null;
 		merged.completed_date = merged.completed ? merged.completed_date || today() : undefined;
 		checkParent(items, merged.id, merged.parent);
 		items[at < 0 ? items.length : at] = toTask(clean(merged));
@@ -115,7 +118,7 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 	}
 	// Walk option/value pairs by position so values that look like flags stay values.
 	const options: Record<string, string> = {};
-	for (let i = action === "release" ? 1 : 2; i < args.length; i++) { if (args[i] === "--no-commit" || args[i] === "--force") { options[args[i]] = "1"; continue; } options[args[i]] = args[++i]; }
+	for (let i = action === "release" ? 1 : 2; i < args.length; i++) { if (args[i] === "--force") { options[args[i]] = "1"; continue; } options[args[i]] = args[++i]; }
 	const option = (key: string): string | undefined => options[key];
 	if (action === "release") {
 		// Clears every claim equal to --claim (session end).
@@ -139,7 +142,7 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 		var before = JSON.stringify([found.name, found.description ?? "", found.blocked_by ?? [], found.human ?? ""]);
 		const claim = option("--claim"), owner = found.claimed_by;
 		// shortcut: a reused pid keeps a claim looking live until --force or release; upgrade by storing a process start time.
-		if ((action === "start" || action === "complete") && claim && owner && owner !== claim && live(found) && !option("--force")) throw new Error(`Task ${value} is claimed by ${owner}; pass force to override`);
+		if ((action === "start" || action === "complete") && owner && owner !== claim && live(found) && !option("--force")) throw new Error(`Task ${value} is claimed by ${owner}; pass force to override`);
 		if (action === "start") { task.started_at = new Date().toISOString(); if (claim) task.claimed_by = claim; }
 		else if (action === "complete") { task.claimed_by = undefined; task.completed = true; task.completed_date ||= today(); task.result = option("--result"); }
 		else if (action === "edit") { if (option("--name") !== undefined) task.name = option("--name")!; if (option("--description") !== undefined) task.description = option("--description"); if (option("--human") !== undefined) task.human = option("--human"); if (option("--blocked-by") !== undefined) { task.blocked_by = ids(option("--blocked-by"))?.map((b) => findId(items, b, file)); checkBlockers(items, task.id, task.blocked_by); } }

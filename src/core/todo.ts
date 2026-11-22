@@ -42,7 +42,7 @@ export const clean = (task: Task): Task => Object.fromEntries(Object.entries(tas
 
 export function parseTodo(line: string): Task {
 	const meta: Record<string, string> = {};
-	let body = line.replace(/(?:^|\s)(dibsid|dibsstart|dibsdesc|dibsparent|dibsresult|dibsby|dibshuman|pri):([^\s:]+)/g, (match, key, value) => {
+	let body = line.replace(/(?:^|\s)(dibsid|dibsstart|dibsdesc|dibsparent|dibsresult|dibsby|dibshuman|dibsblocked|pri):([^\s:]+)/g, (match, key, value) => {
 		if (key === "pri" && !/^[A-Z]$/.test(value)) return match;
 		try { meta[key] = decodeURIComponent(value); return ""; } catch { return match; }
 	}).trim();
@@ -55,14 +55,14 @@ export function parseTodo(line: string): Task {
 	return toTask(clean({
 		id: meta.dibsid || `line-${createHash("sha256").update(line).digest("hex").slice(0, 12)}`,
 		name: body, completed: !!done, priority: pri?.[1] ?? meta.pri, created: created?.[1], completed_date: done?.[1],
-		started_at: meta.dibsstart || null, description: meta.dibsdesc, parent: meta.dibsparent, result: meta.dibsresult, created_by: meta.dibsby, human: meta.dibshuman,
+		started_at: meta.dibsstart || null, description: meta.dibsdesc, parent: meta.dibsparent, result: meta.dibsresult, created_by: meta.dibsby, human: meta.dibshuman, blocked_by: meta.dibsblocked?.split(",").filter(Boolean),
 	}));
 }
 
 // Renders a task as a todo.txt line (export). Completed tasks move priority to pri: per the todo.txt spec.
 export function todoLine(task: Task): string {
 	const head = task.completed ? ["x", task.completed_date] : [task.priority && `(${task.priority})`];
-	const tags = Object.entries({ pri: task.completed ? task.priority : undefined, dibsid: task.id, dibsstart: task.started_at, dibsdesc: task.description, dibsparent: task.parent, dibsresult: task.result, dibsby: task.created_by, dibshuman: task.human })
+	const tags = Object.entries({ pri: task.completed ? task.priority : undefined, dibsid: task.id, dibsstart: task.started_at, dibsdesc: task.description, dibsparent: task.parent, dibsresult: task.result, dibsby: task.created_by, dibshuman: task.human, dibsblocked: task.blocked_by?.join(",") })
 		.filter(([, value]) => typeof value === "string" && value !== "").map(([key, value]) => `${key}:${encodeURIComponent(value as string)}`);
 	const line = [...head, task.created, task.name.trim(), ...tags].filter(Boolean).join(" ");
 	// todo.txt has no escape, so a name that reads back as a marker (x, (A), date) must be refused rather than exported wrong.
@@ -76,5 +76,5 @@ export function checkName(name: string) {
 	if (/[\r\n]/.test(name) || !name.trim()) throw new Error("Task name must be a non-empty single line");
 	if (/^\s*x\s/.test(name)) throw new Error('Task name must not start with "x " (todo.txt completion marker)');
 	if (/^\s*-/.test(name)) throw new Error('Task name must not start with "-"');
-	if (/(?:^|\s)dibs(?:id|start|desc|parent|result|by|human):/.test(name)) throw new Error("Task name must not contain dibs metadata tokens (dibsid:, dibsstart:, dibsdesc:, dibsparent:, dibsresult:, dibsby:, dibshuman:)");
+	if (/(?:^|\s)dibs(?:id|start|desc|parent|result|by|human|blocked):/.test(name)) throw new Error("Task name must not contain dibs metadata tokens (dibsid:, dibsstart:, dibsdesc:, dibsparent:, dibsresult:, dibsby:, dibshuman:, dibsblocked:)");
 }

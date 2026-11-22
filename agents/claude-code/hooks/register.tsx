@@ -14,6 +14,7 @@ const color = { done: 'green', started: 'yellow', open: undefined } as const
 
 let last = ''
 let path = ''
+let launcher: 'dibs' | 'npx' | undefined // the first launcher that ran; later polls skip the ones that don't exist
 
 // The hooks worker may lack the user's PATH (e.g. ~/.bun/bin for dibs and bun), so read it from their shell once.
 async function userPath($: EngineInterface) {
@@ -26,9 +27,16 @@ async function userPath($: EngineInterface) {
 async function refresh($: EngineInterface) {
   const v = await read($, view)
   const ids = await read($, mine)
-  const argv = ['npx', '-y', '@dibs.ai/dibs', 'panel', v, '--json', ...(ids.length ? ['--mine', ids.join(',')] : [])]
+  const args = ['panel', v, '--json', ...(ids.length ? ['--mine', ids.join(',')] : [])]
+  const pth = await userPath($)
+  const cmd = { dibs: ['dibs', ...args], npx: ['npx', '-y', '@dibs.ai/dibs', ...args] }
   try {
-    const { exitCode, stdout } = await $.process.run((p => (p ? ['/usr/bin/env', `PATH=${p}`, ...argv] : argv))(await userPath($)))
+    let r = { exitCode: 127, stdout: '' }
+    for (const k of launcher ? [launcher] : (['dibs', 'npx'] as const)) {
+      r = await $.process.run(pth ? ['/usr/bin/env', `PATH=${pth}`, ...cmd[k]] : cmd[k])
+      if (r.exitCode !== 127) { launcher = k; break }
+    }
+    const { exitCode, stdout } = r
     if (exitCode !== 0) throw new Error('dibs failed')
     if (stdout === last) return
     const p = JSON.parse(stdout) as Panel
@@ -54,19 +62,16 @@ export const register: Register = on => {
 
   on('tool.call', async ($, e, next) => {
     const name: string = e.tool
-    const input = e as Record<string, unknown>
-    const touches = /dibs.*todo_(create|edit|status)$/.test(name)
-    const id = typeof input.id === 'string' || typeof input.id === 'number' ? String(input.id) : null
-    if (touches && id) await update($, mine, m => (m.includes(id) ? m : [...m, id]))
-
     const res = await next(e)
+    const text = 'text' in res && typeof res.text === 'string' ? res.text : JSON.stringify(res)
 
-    if (/todo_create$/.test(name) && /dibs/.test(name) && typeof input.parent !== 'undefined') {
+    if (/dibs.*todo_(create|edit|status)$/.test(name)) {
+      // Replies carry the full id; the input id may be a short prefix.
+      const full = /task (\S+) "/.exec(text)?.[1]
+      const parent = /; parent ([^\s;]+)/.exec(text)?.[1]
       const ids = await read($, mine)
-      const text = 'text' in res && typeof res.text === 'string' ? res.text : JSON.stringify(res)
-      const m = /Created task (\S+)/.exec(text)
-      const nid = m?.[1]
-      if (nid && ids.includes(String(input.parent))) await update($, mine, cur => [...cur, nid])
+      if (full && (!/todo_create$/.test(name) || (parent && ids.includes(parent))))
+        await update($, mine, m => (m.includes(full) ? m : [...m, full]))
     }
     if (name.includes('todo_')) await refresh($)
     return res

@@ -155,7 +155,6 @@ test("config.json layers: global < project < env, scope picks storage", async ()
   expect(existsSync(join(root, "config.json"))).toBe(true);
   expect(JSON.parse(readFileSync(join(root, "projects", "projects.jsonl"), "utf8"))).toMatchObject({ name: "proj", path: cwd, scope: "project" });
   expect(existsSync(join(cwd, ".dibs", "todos", "proj.todos.jsonl"))).toBe(true);
-  expect(JSON.parse(readFileSync(join(cwd, ".dibs", "todos", "lists.jsonl"), "utf8"))).toMatchObject({ name: "proj", file: "proj.todos.jsonl", id: expect.any(String), created: expect.any(String) });
   // .agents alone does not switch stores; /todos migrate moves .dibs into .agents/dibs with its todos.
   mkdirSync(join(cwd, ".agents")); await list(); expect(existsSync(join(cwd, ".agents", "dibs"))).toBe(false);
   const names = async () => (await list()).map((t: any) => t.name);
@@ -201,7 +200,7 @@ test("config.json layers: global < project < env, scope picks storage", async ()
   expect(existsSync(join(other, ".dibs"))).toBe(false);
   expect(readFileSync(join(root, "projects", "projects.jsonl"), "utf8")).toBe(before);
   const tmpRoot = tmpRoot0();
-  for (const f of ["config.json", "todos/lists.jsonl", "todos/untrusted.todos.jsonl"]) expect(existsSync(join(tmpRoot, ".dibs", f))).toBe(true);
+  for (const f of ["config.json", "todos/untrusted.todos.jsonl"]) expect(existsSync(join(tmpRoot, ".dibs", f))).toBe(true);
   // First run ever (no ~/.dibs) onboards even a temp store.
   const { renameSync: mv } = await import("node:fs");
   rmSync(tmpRoot, { recursive: true }); mv(root, `${root}.bak`);
@@ -352,7 +351,7 @@ test.skipIf(process.platform !== "darwin")("Things adapter: writes via URL schem
  } finally { if (prev !== undefined) process.env.DIBS_THINGS_TOKEN = prev; }
 });
 
-test("config.json is JSONC, keeps $schema on this version", async () => {
+test("config.json is JSONC, reading never rewrites $schema", async () => {
  const { mkdtempSync, writeFileSync, readFileSync, readdirSync } = await import("node:fs");
  const { tmpdir } = await import("node:os");
  const { join } = await import("node:path");
@@ -360,11 +359,10 @@ test("config.json is JSONC, keeps $schema on this version", async () => {
  const dir = mkdtempSync(join(tmpdir(), "dibs-jsonc-"));
 		const { name, version } = JSON.parse(readFileSync("package.json", "utf8"));
 		expect(schemaUrl.endsWith(`/${name}@${version}/schema.json`)).toBe(true);
- // Comments, trailing commas and "//" inside strings; an old $schema is bumped without losing comments.
+ // Comments, trailing commas and "//" inside strings; an old $schema is left as written.
  writeFileSync(join(dir, "config.json"), '{\n  "$schema": "https://x/v0.0.1/schema.json", // old\n  /* note */ "file": "~/a//b.jsonl",\n}\n');
  expect(readConfig(dir)).toMatchObject({ file: "~/a//b.jsonl" });
- const text = readFileSync(join(dir, "config.json"), "utf8");
- expect(text).toContain(schemaUrl); expect(text).toContain("// old");
+ expect(readFileSync(join(dir, "config.json"), "utf8")).toBe('{\n  "$schema": "https://x/v0.0.1/schema.json", // old\n  /* note */ "file": "~/a//b.jsonl",\n}\n');
  writeFileSync(join(dir, "config.json"), "{ nope }");
  expect(() => readConfig(dir)).toThrow("Invalid JSON");
  // Every adapter has a schema and every $ref resolves.

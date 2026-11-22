@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { checkName } from "../core/todo.ts";
+import { toolArgs } from "../core/tools.ts";
 import { link, resolveLink, settings, storeFile, version } from "../core/store.ts";
 import { agentName, ghUser } from "../core/identity.ts";
 import { runFile } from "../core/tasks.ts";
@@ -20,22 +20,9 @@ async function sync() {
 }
 
 async function act(action: string, p: Record<string, any>): Promise<string> {
-	for (const k of Object.keys(p)) if (p[k] === "" || p[k] === null) delete p[k];
-	const { id, name, description, parent, result, url, force, query } = p;
-	const human = p.human === "me" ? await ghUser(ctx) ?? "" : p.human;
-	const blocked_by = Array.isArray(p.blocked_by) ? p.blocked_by.join(",") : p.blocked_by;
-	if (action === "link") return link(ctx, id);
-	if (action === "resolve") return resolveLink(url);
-	if (action === "edit" && name === undefined && description === undefined && blocked_by === undefined && human === undefined) throw new Error("todo_edit needs at least one of name, description, blocked_by, human");
-	if (name !== undefined) checkName(name);
-	let args: string[];
-	if (action === "list") args = [...(p.ready ? ["ready"] : ["list", ...(query?.trim() ? ["--query", query] : [])]), ...(human ? ["--human", human] : [])];
-	else if (action === "create") args = ["create", name, ...(description !== undefined ? ["--description", description] : []), ...(parent ? ["--parent", parent] : []), ...(blocked_by !== undefined ? ["--blocked-by", blocked_by] : []), "--created-by", agentName(), "--human", await ghUser(ctx) ?? ""];
-	else if (action === "edit") args = ["edit", id, ...(name !== undefined ? ["--name", name] : []), ...(description !== undefined ? ["--description", description] : []), ...(blocked_by !== undefined ? ["--blocked-by", blocked_by] : []), ...(human !== undefined ? ["--human", human] : [])];
-	else if (p.status === "completed") args = ["complete", id, "--result", result || "Completed", "--claim", claim(), "--no-commit"];
-	else if (result !== undefined) throw new Error("result is only for status completed");
-	else args = ["start", id, "--claim", claim()];
-	if (force && action === "status") args.push("--force");
+	if (action === "link") return link(ctx, p.id);
+	if (action === "resolve") return resolveLink(p.url);
+	const args = await toolArgs(action, p, { creator: agentName(), claim: claim(), user: () => ghUser(ctx) });
 	if (action === "list") await sync();
 	const out = await runFile(storeFile(ctx, settings(ctx)), args);
 	if (action !== "list") await sync();

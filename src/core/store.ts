@@ -1,9 +1,9 @@
 import type { Ctx } from "./ctx.ts";
-import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { home, readJsonl } from "./util.ts";
+import { home, readJsonl, withLock } from "./util.ts";
 import { findId, runFile } from "./tasks.ts";
 
 const { name, version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
@@ -31,8 +31,6 @@ export function readConfig(dir: string): { adapters?: Record<string, { sync?: bo
 	try { text = readFileSync(path, "utf8"); }
 	catch (error: any) { if (error.code === "ENOENT") return {}; throw new Error(`Cannot read ${path}: ${error.message}`); }
 	const config = parseJsonc(text, path);
-	// Text replace, not a rewrite, so the user's comments survive.
-	if (typeof config.$schema === "string" && config.$schema !== schemaUrl) writeFileSync(path, text.replace(JSON.stringify(config.$schema), JSON.stringify(schemaUrl)));
 	if (config.backend !== undefined) throw new Error(`"backend" was replaced by "adapters" in ${path}`);
 	if (config.adapters !== undefined && (typeof config.adapters !== "object" || Array.isArray(config.adapters) || Object.entries(config.adapters).some(([k, v]: [string, any]) => !["dex", "things"].includes(k) || !v || typeof v !== "object" || (v.sync !== undefined && typeof v.sync !== "boolean") || (v.human !== undefined && (typeof v.human !== "string" || !v.human.trim()))))) throw new Error(`Invalid adapters in ${path}`);
 	if (config.file !== undefined && (typeof config.file !== "string" || !config.file.trim())) throw new Error(`Invalid file in ${path}`);
@@ -68,7 +66,18 @@ function saveRegistry(projects: Project[]) {
 	writeFileSync(temp, projects.map((p) => JSON.stringify(p) + "\n").join("")); renameSync(temp, registryFile());
 }
 
-export interface Settings { adapters: Record<string, { sync?: boolean; human?: string }>; file?: string; scope: string; base: string; local: string; name: string; id: string; registered: boolean }
+// Nearest ancestor with a dibs folder; the home dir and the global dibs home are never projects.
+export function findRoot(cwd: string): string | undefined {
+	const real = (p: string) => { try { return realpathSync(p); } catch { return resolve(p); } }, skip = real(dibsHome()); // real: cwd is symlink-resolved, DIBS_HOME may not be
+	for (let dir = resolve(cwd); ; dir = dirname(dir)) {
+		const marked = [".agents/dibs", ".dibs", ".pi-do"].some((m) => existsSync(join(dir, m)));
+		if (marked && dir !== homedir() && real(join(dir, ".dibs")) !== skip && real(join(dir, ".pi-do")) !== skip) return dir;
+		if (dirname(dir) === dir) return undefined;
+	}
+}
+export const projectRoot = (cwd: string) => findRoot(cwd) ?? resolve(cwd);
+
+export interface Settings { root: string; adapters: Record<string, { sync?: boolean; human?: string }>; file?: string; scope: string; base: string; local: string; name: string; id: string; registered: boolean }
 
 export const localDir = (cwd: string) => existsSync(join(cwd, ".agents", "dibs")) ? join(cwd, ".agents/dibs") : withLegacy(join(cwd, ".dibs"));
 export const globalDir = (s: { name: string; id: string }) => join(dibsHome(), "projects", `${s.name}.${s.id}`);
@@ -76,7 +85,7 @@ export const globalDir = (s: { name: string; id: string }) => join(dibsHome(), "
 // The project's id lives in its local config.json (kept in place across scopes) and keys its projects.jsonl record.
 // Scope: forceGlobal > env DIBS_SCOPE > the project's record scope > global config.json > "project".
 export function settings(ctx: Ctx, forceGlobal = false): Settings {
-	const root = dibsHome(), cwd = resolve(ctx.cwd), trusted = ctx.trusted();
+	const root = dibsHome(), cwd = projectRoot(ctx.cwd), trusted = ctx.trusted();
 	if (forceGlobal && !trusted) throw new Error("--global requires a trusted project");
 	const local = localDir(cwd);
 	const id: string = (trusted ? readConfig(local).id : undefined) ?? randomUUID();
@@ -89,8 +98,8 @@ export function settings(ctx: Ctx, forceGlobal = false): Settings {
 	const temp = !trusted && !forceGlobal || scope === "temp";
 	// Temp stores use the same layout as project stores, in a per-session folder.
 	const base = temp ? join(tmpdir(), "dibs", createHash("sha256").update(ctx.sessionId()).digest("hex"), ".dibs") : scope === "global" ? globalDir({ name, id }) : local;
-	const config = { ...globalConfig, ...(base ? readConfig(base) : {}) };
-	return { adapters: config.adapters ?? {}, file: process.env.DIBS_FILE || config.file, scope: temp ? "temp" : scope, base, local, name, id, registered: !!record };
+	const config = { ...globalConfig, ...(base !== local ? readConfig(base) : {}), ...(trusted ? readConfig(local) : {}) };
+	return { adapters: config.adapters ?? {}, file: process.env.DIBS_FILE || config.file, scope: temp ? "temp" : scope, root: cwd, base, local, name, id, registered: !!record };
 }
 
 export const helloWorld = () => JSON.stringify({ id: randomUUID(), name: "Hello World", completed: false, created: new Date().toISOString().slice(0, 10), started_at: null }) + "\n";
@@ -107,12 +116,12 @@ export function storeFile(ctx: Ctx, s: Settings): string {
 	// Temp stores never write into the project or the registry.
 	if (s.scope !== "temp" && !readConfig(s.local).id) { mkdirSync(s.local, { recursive: true }); addId(s.local, s.id); }
 	if (!s.registered && s.scope !== "temp") {
-		appendFileSync(join(dibsHome(), "projects", "projects.jsonl"), JSON.stringify({ id: s.id, name: s.name, path: resolve(ctx.cwd), scope: s.scope, created: new Date().toISOString() }) + "\n");
+		appendFileSync(join(dibsHome(), "projects", "projects.jsonl"), JSON.stringify({ id: s.id, name: s.name, path: s.root, scope: s.scope, created: new Date().toISOString() }) + "\n");
 		s.registered = true;
 	} else if (s.scope !== "temp") {
 		// Last opened wins: a moved project re-registers its new path.
 		const projects = readJsonl(registryFile(), toProject), record = projects.find((p) => p.id === s.id);
-		if (record && record.path !== resolve(ctx.cwd)) { record.path = resolve(ctx.cwd); saveRegistry(projects); }
+		if (record && record.path !== s.root) { record.path = s.root; saveRegistry(projects); }
 	}
 	if (existsSync(file)) return file;
 	mkdirSync(todos, { recursive: true });
@@ -120,8 +129,6 @@ export function storeFile(ctx: Ctx, s: Settings): string {
 	// Hello World onboards installation and new permanent stores; other temp stores start empty.
 	try { writeFileSync(file, s.scope === "temp" && !installing ? "" : helloWorld(), { flag: "wx", mode: 0o600 }); }
 	catch (error: any) { if (error.code === "EEXIST") return file; throw error; }
-	const created = new Date().toISOString();
-	appendFileSync(join(todos, "lists.jsonl"), JSON.stringify({ id: randomUUID(), name: s.name, file: basename(file), created }) + "\n");
 	return file;
 }
 
@@ -130,7 +137,7 @@ export function migrate(ctx: Ctx, target: string): string {
 	if (!ctx.trusted()) throw new Error("migrate requires a trusted project");
 	const s = settings(ctx);
 	if (s.scope !== "project" || s.file) throw new Error("migrate only moves a project-scope dibs folder; use /todos scope to change scope");
-	const to = join(resolve(ctx.cwd), target);
+	const to = join(projectRoot(ctx.cwd), target);
 	if (to === s.base) throw new Error(`Already stored in ${to}`);
 	if (existsSync(to)) throw new Error(`${to} already exists`);
 	mkdirSync(dirname(to), { recursive: true });
@@ -139,8 +146,9 @@ export function migrate(ctx: Ctx, target: string): string {
 }
 
 // Switches scope and moves the todos folder with it; the local config.json (holding the project id) stays put.
-export function setScope(ctx: Ctx, scope: string): string {
+export async function setScope(ctx: Ctx, scope: string): Promise<string> {
 	if (!ctx.trusted()) throw new Error("scope requires a trusted project");
+	if (scope !== "project" && scope !== "global") throw new Error(`Invalid scope: ${scope} (use project or global)`);
 	const s = settings(ctx), registry = join(dibsHome(), "projects", "projects.jsonl");
 	if (s.file) throw new Error("scope does not apply to an explicit file");
 	storeFile(ctx, s); // registers the project and writes its id if needed
@@ -148,14 +156,20 @@ export function setScope(ctx: Ctx, scope: string): string {
 	const record = projects.find((p) => p.id === s.id)!;
 	if (record.scope === scope) return `Already ${scope} scope`;
 	const [from, to] = scope === "global" ? [s.local, globalDir(s)] : [globalDir(s), s.local];
-	if (existsSync(join(to, "todos"))) throw new Error(`${join(to, "todos")} already exists`);
+	const dirs = ["todos", "sync"].filter((d) => existsSync(join(from, d)));
+	for (const d of dirs) if (existsSync(join(to, d))) throw new Error(`${join(to, d)} already exists`);
 	mkdirSync(to, { recursive: true });
 	ensureConfig(to);
-	// Copy then delete: project and home may be on different disks.
-	if (existsSync(join(from, "todos"))) { cpSync(join(from, "todos"), join(to, "todos"), { recursive: true, errorOnExist: true, force: false }); rmSync(join(from, "todos"), { recursive: true }); }
-	if (scope === "project") rmSync(from, { recursive: true, force: true });
-	record.scope = scope;
-	saveRegistry(projects);
+	mkdirSync(join(from, "todos"), { recursive: true });
+	// The lock stops writers between copy and delete; copy then delete because project and home may be on different disks.
+	await withLock(join(from, "todos", `${s.name}.todos.jsonl`), () => {
+		for (const d of dirs) cpSync(join(from, d), join(to, d), { recursive: true, errorOnExist: true, force: false, filter: (src) => !src.endsWith(".lock") });
+		const fresh = readJsonl(registry, toProject); // re-read: the snapshot above predates the copy
+		fresh.find((p) => p.id === s.id)!.scope = scope;
+		saveRegistry(fresh);
+		for (const d of dirs) rmSync(join(from, d), { recursive: true, force: true });
+		if (scope === "project") rmSync(from, { recursive: true, force: true });
+	});
 	return `Scope set to ${scope}: ${storeFile(ctx, settings(ctx))}`;
 }
 

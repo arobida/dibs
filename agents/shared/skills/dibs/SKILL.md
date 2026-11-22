@@ -42,7 +42,7 @@ If Dex or Things sync is enabled in config, run `dibs sync` before reading tasks
 - If `dibs` is not on your PATH, run `npx -y @dibs.ai/dibs` in its place (e.g. `npx -y @dibs.ai/dibs list`).
 - Ids accept a unique prefix: `dibs start a1b` works when only one id starts with `a1b`.
 - Keep the name short. Put details, context, and acceptance criteria in `--description`.
-- Run `start` before you begin a task.
+- Run `start` before you begin a task. A started task stays claimed until `complete`. `--force` takes over a task another agent holds; use it only when that agent is gone.
 - Run `complete --result "..."` when the task is done. The result states what changed, in one line.
 - `ready` lists unblocked work. Pick from it before starting anything else.
 - `list` and `ready` print one line per task. Add `--json` for machine-readable output.
@@ -50,6 +50,7 @@ If Dex or Things sync is enabled in config, run `dibs sync` before reading tasks
 
 ## Trust and storage
 
-- A project is trusted when `DIBS_TRUST=1` is set, or when the project has an `.dibs/` or `.agents/dibs` directory.
+- A project is the nearest folder, from the current folder upward, that has a `.dibs/` or `.agents/dibs/` folder. dibs works from any subfolder of the project.
+- A project is trusted when `DIBS_TRUST=1` is set, or when it has such a folder.
 - Trusted projects store tasks in the project. Untrusted projects use a temporary session store, which the CLI never writes into the repo.
-- `DIBS_SESSION` overrides the session id used for claims.
+- `DIBS_SESSION` names the CLI claim owner (`cli:<DIBS_SESSION>`) and keys the temp store, which otherwise uses the current folder.

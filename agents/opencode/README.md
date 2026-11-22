@@ -38,4 +38,4 @@ A live task panel (views `current`/`project`/`completed`, like the Pi panel) sho
 
 Local plugin entries are documented as directories or package names; if the file path is rejected, point at `/absolute/path/to/dibs/agents/opencode` (its `package.json` exports `./tui`). Install peers there first: `cd agents/opencode && nub add @opencode/plugin @opentui/core @opentui/solid solid-js`.
 
-Keys: `ctrl+shift+v` cycles the view, `ctrl+shift+t` collapses (also `/tasks-view`, `/tasks-toggle`, and the command palette). The panel refreshes every 3 s and after any event mentioning a `todo_*` tool. Not verified against a running opencode.
+Keys: `ctrl+shift+v` cycles the view, `ctrl+shift+t` collapses (also `/tasks-view`, `/tasks-toggle`, and the command palette). The panel refreshes every 3 s and after any event mentioning a `todo_*` tool. It runs `dibs` when it is on your PATH and falls back to `npx -y @dibs.ai/dibs`. Not verified against a running opencode.
