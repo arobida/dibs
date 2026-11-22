@@ -1,6 +1,6 @@
 {
   "name": "@dibs.ai/opencode",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "opencode TUI plugin for dibs: task panel.",
   "type": "module",
   "keywords": [
