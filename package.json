@@ -28,6 +28,7 @@
   },
   "files": [
     "lib/",
+    "agents/shared/skills/dibs/SKILL.md",
     "src/core/adapters/*/*.schema.json",
     "schema.json",
     "README.md",

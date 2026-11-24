@@ -1,5 +1,5 @@
 import type { Ctx } from "../../ctx.ts";
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Task } from "../../todo.ts";
@@ -10,15 +10,23 @@ import { dibsHome } from "../../store.ts";
 const tokenFile = () => join(dibsHome(), "adapters", "things.json");
 export function saveThingsToken(token: string): string {
 	if (!/^[\w-]+$/.test(token)) throw new Error("Invalid Things auth token");
-	mkdirSync(join(dibsHome(), "adapters"), { recursive: true });
-	writeFileSync(tokenFile(), JSON.stringify({ token }) + "\n", { mode: 0o600 });
-	chmodSync(tokenFile(), 0o600);
-	return `Saved Things auth token to ${tokenFile()}`;
+	mkdirSync(join(dibsHome(), "adapters"), { recursive: true, mode: 0o700 });
+	const file = tokenFile(), temp = `${file}.${randomUUID()}.tmp`;
+	try {
+		writeFileSync(temp, JSON.stringify({ token }) + "\n", { flag: "wx", mode: 0o600 });
+		renameSync(temp, file);
+	} finally { rmSync(temp, { force: true }); }
+	return `Saved Things auth token to ${file}`;
 }
-function token(): string {
+export function readThingsToken(): unknown {
 	if (process.env.DIBS_THINGS_TOKEN) return process.env.DIBS_THINGS_TOKEN;
 	try { return JSON.parse(readFileSync(tokenFile(), "utf8")).token; }
-	catch { throw new Error("Things auth token missing: run /todos connect things <token>"); }
+	catch { return undefined; }
+}
+function token(): string {
+	const value = readThingsToken();
+	if (typeof value !== "string" || !/^[\w-]+$/.test(value)) throw new Error("Things auth token missing or invalid: run dibs init --connect");
+	return value;
 }
 
 // Marks a new to-do's notes so the next read can find its Things id (the URL scheme cannot return it to a CLI).

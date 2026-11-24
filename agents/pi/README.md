@@ -8,7 +8,9 @@ The Pi extension gives Pi the dibs task tools, a `/todos` command and a task pan
 pi install @dibs.ai/pi
 ```
 
-Run `/reload` in Pi after you edit a `config.json`. The Dex adapter also needs `dex` on your PATH.
+Alternatively, after user consent, run `dibs init --agent pi --install-agent` to initialize storage and install the extension in user configuration. Run `dibs doctor --agent pi` for read-only checks; see [Init and doctor](../../README.md#init-and-doctor). Configuration evidence does not prove loaded tools.
+
+Run `/reload` in Pi after installation or after you edit a `config.json`.
 
 ## Tools
 
@@ -33,6 +35,6 @@ The panel reloads when another agent changes the store. `ctrl+shift+v` cycles th
 | `/todos [current\|project\|completed]` | Select a view |
 | `/todos export <path> [--global]` | Write todo.txt; does not overwrite an existing file |
 | `/todos import <path> [--global]` | Read todo.txt; skips `dibsid:`s already in the store |
-| `/todos connect things <token>` | Save the Things 3 token (see the [Things adapter](../../src/core/adapters/things/README.md)) |
+| `/todos connect things <token>` | Legacy token helper; prefer `dibs init --connect` with private input (see the [Things adapter](../../src/core/adapters/things/README.md)) |
 | `/todos scope project\|global` | Move the todos and sync folders (see [Storage](../../README.md#storage)) |
 | `/todos migrate .dibs\|.agents/dibs` | Move the project store folder |

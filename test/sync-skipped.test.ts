@@ -2,15 +2,7 @@ import { expect, test } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { sync } from "../src/core/adapters/sync.ts";
-import { dexAdapter } from "../src/core/adapters/dex/index.ts";
 import { runFile } from "../src/core/tasks.ts";
-
-test("dex: cleared description sends an empty edit", async () => {
-	const calls: string[][] = [];
-	const ctx: any = { cwd: tmpdir(), sessionId: () => "s", trusted: () => true, exec: async (c: string, a: string[]) => { calls.push([c, ...a]); return { stdout: "", stderr: "", code: 0 }; } };
-	await dexAdapter(ctx).update("d1", { description: undefined });
-	expect(calls.some((c) => ["edit", "d1", "--description", ""].every((x, i) => c[c.indexOf("edit") + i] === x))).toBe(true);
-});
 
 const setup = (update: (remote: Map<string, any>, id: string, p: any) => string[] | void) => {
 	const dir = mkdtempSync(`${tmpdir()}/dibs-skip-`), remote = new Map<string, any>(); let n = 0, updates = 0;

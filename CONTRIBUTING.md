@@ -15,6 +15,11 @@ agents/pi/index.ts      Extension entry point: tools, /todos command, shortcuts,
 src/core/todo.ts        Task type and todo.txt line parse/format/validation
 src/core/store.ts       Settings, scopes, store paths, project registry, migrate/scope moves
 src/core/identity.ts    Agent name and GitHub user resolution
+src/core/init-adapter.ts   Consent-based project adapter selection
+src/core/init-connection.ts  Private Things credentials and read-only connection probe
+src/core/init-agent.ts     Consent-based host installation and configuration
+src/core/agent-verification.ts  Host detection and configuration evidence
+src/core/doctor.ts      Read-only installation, storage, and identity checks
 src/core/util.ts        Shared helpers: ~ expansion, file lock, JSONL reader
 src/core/tasks.ts       Actions on the dibs JSONL todos file (the one store)
 src/core/panel.ts       Task panel views shared by the agents
@@ -27,7 +32,7 @@ agents/<name>/          Per-agent integration (pi, claude-code, codex, opencode,
 scripts/build-agent.ts  Builds dist/<name> = shared + agent overrides
 src/core/adapters/sync.ts    Adapter interface and 3-way two-way sync engine
 src/core/adapters/sync-all.ts  Syncs every adapter enabled in config
-src/core/adapters/dex/       Dex adapter: CLI calls, Dex-to-Task mapping, watch folders
+src/core/imports/dex.ts     One-time read-only Dex import, validation and merge
 src/core/adapters/things/    Things 3 adapter: URL scheme writes, JXA reads, auth token file
 test/*.test.ts          Vitest test suite
 CHANGELOG.md            Release notes
@@ -73,15 +78,22 @@ To test one agent, run `rex do test/e2e/panel.lua agent=pi|claude|opencode`. Run
 
 ## Releasing
 
+All three packages (`@dibs.ai/dibs`, `@dibs.ai/pi`, `@dibs.ai/opencode`) share one version, and each release is a repo tag `v<version>`. Run `nub login` first.
+
 ```sh
-nub run bump <patch|minor|major|x.y.z> [. | agents/pi | agents/opencode]
+nub run bump dev                        # prerelease X.Y.Z-dev.N from any branch, npm dist-tag "dev"
+nub run bump <patch|minor|major|x.y.z>  # stable release from main, npm dist-tag "latest"
 ```
 
-The package directory defaults to `.`. [`scripts/bump.ts`](scripts/bump.ts) requires a clean tree, runs the tests, bumps `package.json` and `jsr.json`, commits `Release <name>@<version>`, tags `<name>@<version>`, pushes, and runs [`scripts/release.ts`](scripts/release.ts). That publishes the package to npm, and the core package to JSR too; run `nub login` first. If publishing fails, fix the cause and run `nub run release`: it skips versions already live and fails loudly on any that did not publish.
+Test a dev release with `npm install @dibs.ai/dibs@dev` (or `@dibs.ai/pi@dev`, `@dibs.ai/opencode@dev`). A dev release never moves `latest`. JSR has no dist-tags, so core dev versions go to JSR as prereleases, which JSR does not pick for an unpinned import.
 
-JSR has no stored login. Save a JSR token in the macOS Keychain once with `security add-generic-password -U -a "$USER" -s jsr-token -w`, then run `nub run release --jsr` to publish with it. `JSR_TOKEN=<token> nub run release` works too.
+[`scripts/bump.ts`](scripts/bump.ts) requires a clean tree; a stable bump also requires being on `main` in sync with `origin/main`. It runs type checks, tests and build, writes the new version to every `package.json` and `jsr.json`, commits, tags `v<version>`, atomically pushes the commit and tag to `origin`, and runs [`scripts/release.ts`](scripts/release.ts). Core is published first, then the agent packages; core also goes to JSR.
 
-Configs point `$schema` at `https://raw.githubusercontent.com/arobida/dibs/@dibs.ai/dibs@<version>/schema.json` ([`src/core/store.ts`](src/core/store.ts)), the core package's release tag, so that URL returns 404 until the tag is pushed.
+If publishing fails, stay on the release commit and run `nub run release`. It requires a clean tree, matching versions in every package, and a `v<version>` tag that points to HEAD and matches `origin`; a stable version must also be the tip of `origin/main`. It skips registry versions already live. A failed push can be retried with `git push --atomic origin HEAD refs/tags/v<version>` before running the release command.
+
+JSR has no stored login. Set `JSR_TOKEN` when running the bump or release command. Alternatively, save a JSR token in the macOS Keychain with `security add-generic-password -U -a "$USER" -s jsr-token -w`, then retry with `nub run release --jsr`.
+
+Configs point `$schema` at `https://raw.githubusercontent.com/arobida/dibs/v<version>/schema.json` ([`src/core/store.ts`](src/core/store.ts)), the release tag, so that URL returns 404 until the tag is pushed.
 
 ## Documentation
 

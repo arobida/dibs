@@ -1,3 +1,5 @@
+> NOTE: The Dex sync adapter is removed. Use the [one-time Dex import](../../../../README.md#dex-import). The historical adapter instructions below are retained for reference.
+
 # Dex adapter
 
 Syncs the dibs store with [Dex](https://github.com/dcramer/dex) through the `dex` CLI.

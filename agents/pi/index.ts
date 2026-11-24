@@ -8,7 +8,6 @@ import { home } from "@dibs.ai/dibs/core/util.ts";
 import { link, migrate, resolveLink, setScope, settings, storeFile } from "@dibs.ai/dibs/core/store.ts";
 import { toolArgs } from "@dibs.ai/dibs/core/tools.ts";
 import { runFile } from "@dibs.ai/dibs/core/tasks.ts";
-import { dexWatchDirs } from "@dibs.ai/dibs/core/adapters/dex/index.ts";
 import { ghUser } from "@dibs.ai/dibs/core/identity.ts";
 import { syncAll as syncAllCore } from "@dibs.ai/dibs/core/adapters/sync-all.ts";
 import { saveThingsToken } from "@dibs.ai/dibs/core/adapters/things/index.ts";
@@ -185,21 +184,10 @@ export default function taskPanel(pi: ExtensionAPI) {
 				watchers.push(w);
 			};
 			watchDir(dir, false, (name) => { if (name === file.slice(dir.length + 1)) later(() => refresh(ctx)); });
-			// Dex edits from other agents pull in through sync, which then rewrites the store and refreshes.
-			if (s.adapters.dex?.sync) for (const d of (await dexWatchDirs(toCtx(pi, ctx))) ?? []) watchDir(d, true, () => later(() => syncAll(ctx)));
 		} catch {}
 	}
 	pi.on("session_shutdown", async (_event, ctx) => { unwatch(); try { await runFile(storeFile(toCtx(pi, ctx), settings(toCtx(pi, ctx))), ["release", "--claim", claim(ctx)]); } catch {} });
 	pi.on("session_start", async (_event, ctx) => { void watchStore(ctx); restore(ctx); try { await refresh(ctx); } catch (error) { if (ctx.hasUI) ctx.ui.notify(`Tasks: ${error}`, "error"); } });
-	// Reload the store before each prompt so tasks other agents wrote show up; adapters sync on task tool calls and the Dex watcher, not here.
+	// Reload the store before each prompt so tasks other agents wrote show up; adapters sync on task tool calls, not here.
 	pi.on("before_agent_start", async (_event, ctx) => { try { await refresh(ctx); } catch {} });
-	pi.on("tool_result", async (event, ctx) => {
-		if (event.isError) return;
-		try { if (!settings(toCtx(pi, ctx)).adapters.dex?.sync) return; } catch (error) { if (ctx.hasUI) ctx.ui.notify(`Tasks: ${error}`, "error"); return; }
-		// Only the todo_* tools mark tasks as this session's; shell text can't prove what ran, so bash dex calls just refresh.
-		const command = event.toolName === "bash" ? String(event.input?.command ?? "") : "";
-		if (/\bdex\b/.test(command) || /dex/i.test(event.toolName)) {
-			try { await refresh(ctx); } catch (error) { if (ctx.hasUI) ctx.ui.notify(`Tasks: ${error}`, "error"); }
-		}
-	});
 }

@@ -9,7 +9,7 @@ import { findId, runFile } from "./tasks.ts";
 const { name, version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
 // Pinned to this install's version so editors validate against the options it supports. scripts/bump.ts tags releases <name>@<version>.
 export { version };
-export const schemaUrl = `https://raw.githubusercontent.com/arobida/dibs/${name}@${version}/schema.json`;
+export const schemaUrl = `https://raw.githubusercontent.com/arobida/dibs/v${version}/schema.json`;
 
 // JSONC: drops comments, then trailing commas (second pass catches a comma that sat before a comment); strings are kept as-is.
 const stripJsonc = (t: string) => t.replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\/|,(\s*[}\]])/g, (_m, str, close) => str ?? close ?? "");
@@ -104,8 +104,19 @@ export function settings(ctx: Ctx, forceGlobal = false): Settings {
 
 export const helloWorld = () => JSON.stringify({ id: randomUUID(), name: "Hello World", completed: false, created: new Date().toISOString().slice(0, 10), started_at: null }) + "\n";
 
+// Explicit initialization creates an empty durable store, never the onboarding task.
+export function initStore(ctx: Ctx, global = false): string {
+	const trusted = { ...ctx, trusted: () => true };
+	const s = settings(trusted, global);
+	if (s.scope === "temp") throw new Error("init requires durable storage; unset DIBS_SCOPE=temp");
+	const file = storeFile(trusted, s, "");
+	mkdirSync(dirname(file), { recursive: true });
+	if (!existsSync(file)) writeFileSync(file, "", { flag: "wx", mode: 0o600 });
+	return file;
+}
+
 // Resolves the todos file, creating the dibs folder, config, list index, project registration and Hello World todo on first use.
-export function storeFile(ctx: Ctx, s: Settings): string {
+export function storeFile(ctx: Ctx, s: Settings, seed?: string): string {
 	// ~/.dibs always exists: global config plus the projects registry. Its absence means this run is the installation.
 	const installing = !existsSync(join(dibsHome(), "config.json"));
 	mkdirSync(join(dibsHome(), "projects"), { recursive: true });
@@ -127,7 +138,7 @@ export function storeFile(ctx: Ctx, s: Settings): string {
 	mkdirSync(todos, { recursive: true });
 	ensureConfig(s.base);
 	// Hello World onboards installation and new permanent stores; other temp stores start empty.
-	try { writeFileSync(file, s.scope === "temp" && !installing ? "" : helloWorld(), { flag: "wx", mode: 0o600 }); }
+	try { writeFileSync(file, seed ?? (s.scope === "temp" && !installing ? "" : helloWorld()), { flag: "wx", mode: 0o600 }); }
 	catch (error: any) { if (error.code === "EEXIST") return file; throw error; }
 	return file;
 }

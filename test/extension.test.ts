@@ -30,7 +30,7 @@ test("registers the existing tool, command, shortcuts, and lifecycle hooks", () 
  expect(tools.map(t => t.name)).toEqual(["todo_list", "todo_create", "todo_edit", "todo_status", "todo_link", "todo_resolve"]);
  expect(commands).toEqual(["todos"]);
  expect(shortcuts).toEqual(["ctrl+shift+t", "ctrl+shift+v"]);
- expect(events).toEqual(["session_shutdown", "session_start", "before_agent_start", "tool_result"]);
+ expect(events).toEqual(["session_shutdown", "session_start", "before_agent_start"]);
 });
 
 test("shows the above-editor task panel even when there are no tasks", async () => {
@@ -97,42 +97,6 @@ test("file backend persists task operations without Dex", async () => {
   rmSync(dir, { recursive: true, force: true });
  }
 });
-
-test.skipIf(spawnSync("which", ["dex"]).status !== 0)("Dex adapter syncs both ways", async () => {
- const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
- const { tmpdir } = await import("node:os");
- const { join } = await import("node:path");
- const dir = mkdtempSync(join(tmpdir(), "dibs-dex-test-")), store = join(dir, "store");
- const prev = { home: process.env.DIBS_HOME, file: process.env.DIBS_FILE };
- process.env.DIBS_HOME = join(dir, "home"); process.env.DIBS_FILE = join(dir, "tasks.jsonl");
- (await import("node:fs")).mkdirSync(process.env.DIBS_HOME, { recursive: true });
- writeFileSync(join(process.env.DIBS_HOME, "config.json"), JSON.stringify({ adapters: { dex: { sync: true } } }) + "\n");
- const dex = async (args: string[]) => { return await new Promise<{ stdout: string; stderr: string; code: number | null }>((res) => { const p = spawn("dex", ["--storage-path", store, ...args]); let stdout = "", stderr = ""; p.stdout.on("data", (d) => stdout += d); p.stderr.on("data", (d) => stderr += d); p.on("close", (code) => res({ stdout, stderr, code })); }); };
- try {
-  let tool: any;
-  extension({ registerTool: (t: any) => tool = shimTool(t), registerCommand() {}, registerShortcut() {}, on() {}, appendEntry() {}, exec: async (_cmd: string, args: string[]) => dex(args[0] === "--storage-path" ? args.slice(2) : args) } as any);
-  const ctx = { cwd: dir, hasUI: false, isProjectTrusted: () => false, ui: { notify(m: string) { throw new Error(m); } }, sessionManager: { getSessionId: () => "dex-sync" } };
-  const run = async (params: any) => (await tool.execute("call", params, undefined, undefined, ctx)).content[0].text;
-  const remote = async () => JSON.parse((await dex(["list", "--all", "--json"])).stdout);
-  const id = (await run({ action: "create", name: "(A) Call +Family @phone", description: "details" })).match(/Created task (\S+)/)![1];
-  let [r] = await remote();
-  expect(r).toMatchObject({ name: "(A) Call +Family @phone", description: "details", completed: false });
-  await dex(["edit", r.id, "--name", "Renamed in dex"]);
-  await dex(["create", "From dex"]);
-  let tasks = JSON.parse(await run({ action: "list" }));
-  expect(tasks.map((t: any) => t.name)).toEqual(["Renamed in dex", "From dex"]);
-  expect(tasks[0].id).toBe(id);
-  await dex(["edit", r.id, "--name", "edited in dex"]);
-  await run({ action: "complete", id, result: "done" });
-  [r] = (await remote()).filter((t: any) => t.id === r.id);
-  expect(r).toMatchObject({ name: "edited in dex", completed: true, result: "done" });
-  expect(JSON.parse(await run({ action: "list" }))).toHaveLength(2);
- } finally {
-  for (const [k, v] of Object.entries({ DIBS_HOME: prev.home, DIBS_FILE: prev.file })) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
-  rmSync(dir, { recursive: true, force: true });
- }
-});
-
 
 test("config.json layers: global < project < env, scope picks storage", async () => {
  const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } = await import("node:fs");
@@ -212,7 +176,7 @@ test("config.json layers: global < project < env, scope picks storage", async ()
   writeFileSync(join(pdir, "config.json"), JSON.stringify({ adapters: { dex: { sync: false } } }) + "\n");
   await list(); expect(dexCalls).toBe(0);
   writeFileSync(join(pdir, "config.json"), "");
-  await list(); expect(dexCalls).toBeGreaterThan(0);
+  await list(); expect(dexCalls).toBe(0);
   writeFileSync(join(root, "config.json"), "");
   // --global export/import targets the global store explicitly.
   await command.handler("export out.txt --global", ctx);
@@ -357,8 +321,8 @@ test("config.json is JSONC, reading never rewrites $schema", async () => {
  const { join } = await import("node:path");
  const { readConfig, schemaUrl } = await import("../src/core/store.ts");
  const dir = mkdtempSync(join(tmpdir(), "dibs-jsonc-"));
-		const { name, version } = JSON.parse(readFileSync("package.json", "utf8"));
-		expect(schemaUrl.endsWith(`/${name}@${version}/schema.json`)).toBe(true);
+		const { version } = JSON.parse(readFileSync("package.json", "utf8"));
+		expect(schemaUrl.endsWith(`/v${version}/schema.json`)).toBe(true);
  // Comments, trailing commas and "//" inside strings; an old $schema is left as written.
  writeFileSync(join(dir, "config.json"), '{\n  "$schema": "https://x/v0.0.1/schema.json", // old\n  /* note */ "file": "~/a//b.jsonl",\n}\n');
  expect(readConfig(dir)).toMatchObject({ file: "~/a//b.jsonl" });
@@ -367,8 +331,8 @@ test("config.json is JSONC, reading never rewrites $schema", async () => {
  expect(() => readConfig(dir)).toThrow("Invalid JSON");
  // Every adapter has a schema and every $ref resolves.
  const schema = JSON.parse(readFileSync("schema.json", "utf8"));
- const refs = Object.values(schema.properties.adapters.properties).map((p: any) => p.$ref);
- expect(refs.sort()).toEqual(readdirSync("src/core/adapters", { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => `src/core/adapters/${d.name}/${d.name}.schema.json`).sort());
+ const refs = Object.values(schema.properties.adapters.properties).map((p: any) => p.$ref).filter(Boolean);
+ expect(refs.sort()).toEqual(readdirSync("src/core/adapters", { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== "dex").map((d) => `src/core/adapters/${d.name}/${d.name}.schema.json`).sort());
  for (const ref of refs) expect(JSON.parse(readFileSync(ref, "utf8")).type).toBe("object");
 });
 

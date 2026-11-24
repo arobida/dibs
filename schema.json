@@ -25,7 +25,7 @@
       "description": "Sync dibs todos with other task apps.",
       "additionalProperties": false,
       "properties": {
-        "dex": { "$ref": "src/core/adapters/dex/dex.schema.json" },
+        "dex": { "type": "object", "deprecated": true, "description": "Removed adapter. Disable sync and use dibs init --from=dex instead.", "properties": { "sync": { "type": "boolean" }, "human": { "type": "string", "minLength": 1 } }, "additionalProperties": false },
         "things": { "$ref": "src/core/adapters/things/things.schema.json" }
       }
     }

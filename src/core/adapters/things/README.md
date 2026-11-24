@@ -6,16 +6,13 @@ Syncs the dibs store with [Things 3](https://culturedcode.com/things/) on macOS.
 
 1. Install Things 3 on the Mac that runs dibs.
 2. Enable the URL scheme and copy the auth token: Things → Settings → General → Enable Things URLs → Manage.
-3. Save the token in Pi:
-   ```
-   /todos connect things <token>
-   ```
-   Outside Pi, set `DIBS_THINGS_TOKEN` in the environment of the CLI or MCP server. The Pi command writes the token to `~/.dibs/adapters/things.json` with `0600` permissions, never to a `config.json` (which may be committed). `DIBS_THINGS_TOKEN` overrides the file.
-4. Turn sync on in a dibs `config.json` (global `~/.dibs/config.json` or the project's):
-   ```json
-   {"adapters": {"things": {"sync": true}}}
-   ```
-5. Run `/reload` in Pi, or `npx -y @dibs.ai/dibs sync` from the CLI. On the first read, macOS asks to let your terminal control Things 3 (System Settings → Privacy & Security → Automation); allow it.
+3. Run `dibs init --adapter things` after consenting to enable sync. For an already enabled adapter, run `dibs init --connect`.
+4. Enter the token through the hidden TTY prompt. Without a TTY, set `DIBS_THINGS_TOKEN` privately before rerunning. Never put the token in chat or a CLI argument.
+5. Allow macOS Automation access if prompted (System Settings → Privacy & Security → Automation). Init probes read access through `.list()` using `osascript`; it never syncs, creates, or updates tasks.
+
+Hidden input saves the token to `~/.dibs/adapters/things.json` with `0600` permissions, never to a `config.json` that may be committed. `DIBS_THINGS_TOKEN` overrides the file. Missing credentials leave connection setup pending. A valid token shape and successful read do not authenticate the token for writes.
+
+The Pi `/todos connect things <token>` helper remains backward compatible, but private `init` input is recommended. Run `/reload` in Pi after configuration changes. Sync explicitly with `dibs sync` when ready; see the [setup reference](../../../../README.md#init-and-doctor) for consent and read-only doctor checks.
 
 To disconnect, set `"sync": false` or remove the entry, and delete `~/.dibs/adapters/things.json`. Tasks already synced stay on both sides.
 

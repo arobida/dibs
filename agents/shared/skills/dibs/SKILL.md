@@ -13,6 +13,18 @@ Track work as tasks with the `dibs` CLI. Use it for any multi-step job, so progr
 - You need to know what is next, or what is blocked.
 - You finish a unit of work and should record the result.
 
+## Init and doctor
+
+Run `dibs init` for empty durable storage, or `dibs init --from dex` for a one-time Dex import. Before selecting `--adapter things` or `--adapter none`, ask the user whether to enable Things. Noninteractive init leaves the choice pending until you rerun with their answer.
+
+Ask for installation consent before `dibs init --agent <host> --install-agent`. Supported hosts are `pi`, `claude-code`, `codex`, `opencode`, and `cursor`; use `--agent` when detection is unavailable. Pi and Claude setup changes user configuration; Codex changes user MCP configuration and a project skill. Cursor and OpenCode setup writes project skill/MCP files only.
+
+For enabled Things, use `dibs init --connect` after consent. Have the user enter the token through hidden TTY input or set `DIBS_THINGS_TOKEN` privately. Never ask for secrets in chat or pass them as CLI arguments. The read probe does not sync or authenticate the token for writes.
+
+Init runs doctor automatically. Use `dibs doctor --json` for standalone read-only checks without commands, external contacts, locks, or writes. Init errors leave saved state intact; pending setup can exit 0, so inspect `connection`, `agentSetup`, `doctor`, and their instructions in `init --json` output.
+
+After reload/restart, inspect your tool inventory for `todo_list`, `todo_create`, `todo_edit`, `todo_status`, `todo_link`, and `todo_resolve` without invoking task tools or syncing. Report missing tools as unverified setup. Configuration evidence and installed packages do not prove tools loaded in this session. See the [setup reference](https://github.com/arobida/dibs#init-and-doctor).
+
 ## Commands
 
 ```sh
@@ -34,7 +46,7 @@ dibs migrate .agents/dibs
 dibs sync
 ```
 
-If Dex or Things sync is enabled in config, run `dibs sync` before reading tasks and after finishing work.
+If Things sync is enabled in config, run `dibs sync` before reading tasks and after finishing work.
 
 ## Rules
 

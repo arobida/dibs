@@ -71,7 +71,7 @@ export function todoLine(task: Task): string {
 	return line;
 }
 
-// Names must survive a todo.txt export/import round trip and must not reach Dex as a flag.
+// Names must survive a todo.txt export/import round trip.
 export function checkName(name: string) {
 	if (/[\r\n]/.test(name) || !name.trim()) throw new Error("Task name must be a non-empty single line");
 	if (/^\s*x\s/.test(name)) throw new Error('Task name must not start with "x " (todo.txt completion marker)');
