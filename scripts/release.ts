@@ -49,7 +49,7 @@ const jsrLive = async (name: string, version: string) => {
 for (const dir of dirs) {
 	const { name } = JSON.parse(await readFile(`${dir}/package.json`, "utf8"));
 	if (await npmLive(name, version)) { console.log(`npm ${name}@${version}: already published, skipping`); continue; }
-	await $`nub publish --access public --tag ${distTag} ${otp}`.cwd(dir).noThrow(); // trust the registry, not the exit code
+	await $`nub publish --access public --tag ${distTag} ${otp} ${stable ? [] : ["--no-git-checks"]}`.cwd(dir).noThrow(); // trust the registry, not the exit code
 	console.log(`waiting for npm to release ${name}@${version}…`);
 	if (!(await npmLive(name, version, 60))) throw new Error(`npm ${name}@${version} did not publish; if 2FA is required, rerun with NPM_OTP=<code> nub run release`);
 }
