@@ -1,4 +1,4 @@
-> NOTE: The Dex sync adapter is removed. Use the [one-time Dex import](../../../../README.md#dex-import). The historical adapter instructions below are retained for reference.
+> NOTE: The Dex sync adapter is removed. Use the [one-time Dex import](../../../../../../README.md#dex-import). The historical adapter instructions below are retained for reference.
 
 # Dex adapter
 
@@ -27,7 +27,7 @@ To disconnect, set `"sync": false` or remove the entry. Tasks already synced sta
 | Started | yes | yes |
 | Completed + result | yes | yes |
 
-- Two-way, on the schedule in the [main README](../../../../README.md#adapters). Pi also syncs when Dex's storage folder changes (file storage engine only), so changes other agents make in Dex show up without a dibs action.
+- Two-way, on the schedule in the [main README](../../../../../../README.md#adapters). Pi also syncs when Dex's storage folder changes (file storage engine only), so changes other agents make in Dex show up without a dibs action.
 - Conflicts: per field, a change on one side since the last sync is copied across. If both sides changed the same field, dibs wins.
 - State: links and last-synced copies live in `sync/dex.jsonl` next to the store's `config.json`.
 - Completing in Dex uses `--no-commit --force`.

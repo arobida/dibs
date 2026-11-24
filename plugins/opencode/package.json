@@ -32,6 +32,6 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/arobida/dibs.git",
-    "directory": "agents/opencode"
+    "directory": "plugins/opencode"
   }
 }

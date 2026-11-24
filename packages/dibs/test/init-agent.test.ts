@@ -59,8 +59,8 @@ test.each(['invalid', '{}', '[{}]'])("Codex inspection %s cannot authorize overw
  expect((await initAgent(ctx,"codex",{interactive:false,consent:true})).status).toBe("error");expect(ctx.exec).toHaveBeenCalledTimes(1);
 });
 test("skill asset resolves from source and build and is packaged",()=> {
- for(const base of ["src/core","lib/core"])expect(existsSync(join(process.cwd(),base,"../../agents/shared/skills/dibs/SKILL.md"))).toBe(true);
- expect(JSON.parse(readFileSync("package.json","utf8")).files).toContain("agents/shared/skills/dibs/SKILL.md");
+ for(const base of ["src/core","lib/core"])expect(existsSync(join(process.cwd(),base,"../../skills/dibs/SKILL.md"))).toBe(true);
+ expect(JSON.parse(readFileSync("package.json","utf8")).files).toContain("skills/");
 });
 test.each(["pi", "claude-code"] as const)("configured %s does not reprompt but explicit repair executes",async agent=> {
  const path=agent==="pi" ? join(process.env.PI_CODING_AGENT_DIR!,"settings.json") : join(process.env.HOME!,".claude/plugins/installed_plugins.json");

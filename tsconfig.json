@@ -1,15 +1,16 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "module": "nodenext",
-    "target": "es2022",
-    "skipLibCheck": true,
-    "types": ["node"],
     "jsx": "preserve",
     "jsxImportSource": "@opentui/solid"
   },
-  "include": ["src", "agents", "test", "scripts"],
-  "exclude": ["agents/claude-code"]
+  "include": [
+    "packages/*/src",
+    "packages/*/test",
+    "plugins",
+    "scripts"
+  ],
+  "exclude": [
+    "plugins/claude-code"
+  ]
 }

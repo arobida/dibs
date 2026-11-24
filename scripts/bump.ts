@@ -2,7 +2,7 @@
 import $ from "dax";
 import { readFile, writeFile } from "node:fs/promises";
 
-const files = ["package.json", "agents/pi/package.json", "agents/opencode/package.json", "jsr.json"];
+const files = ["packages/dibs/package.json", "plugins/pi/package.json", "plugins/opencode/package.json", "packages/dibs/jsr.json"];
 const [inc] = process.argv.slice(2);
 if (!inc) throw new Error("usage: nub run bump <patch|minor|major|dev|x.y.z>");
 if ((await $`git status --porcelain`.text()).trim()) throw new Error("commit or stash your changes first");
@@ -17,7 +17,7 @@ function next(current: string, inc: string) {
 	throw new Error(`bad increment ${inc}`);
 }
 
-const { version: current } = JSON.parse(await readFile("package.json", "utf8"));
+const { version: current } = JSON.parse(await readFile(files[0], "utf8"));
 const version = next(current, inc);
 const stable = !version.includes("-");
 const branch = (await $`git branch --show-current`.text()).trim();

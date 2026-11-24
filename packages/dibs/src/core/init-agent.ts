@@ -50,7 +50,7 @@ export async function initAgent(ctx: Ctx, agent: AgentHost | undefined, options:
 		} else {
 			const skill = join(ctx.cwd, agent === "codex" ? ".agents" : `.${agent}`, "skills/dibs/SKILL.md");
 			if (!existsSync(skill)) {
-				const content = readFileSync(join(import.meta.dirname, "../../agents/shared/skills/dibs/SKILL.md"));
+				const content = readFileSync(join(import.meta.dirname, "../../skills/dibs/SKILL.md"));
 				mkdirSync(dirname(skill), { recursive: true });
 				try { writeFileSync(skill, content, { flag: "wx" }); changedPaths.push(skill); }
 				catch (error: any) { if (error.code !== "EEXIST") throw error; }

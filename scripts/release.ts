@@ -4,10 +4,10 @@ import $ from "dax";
 import { readFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
-const dirs = [".", "agents/pi", "agents/opencode"];
+const dirs = ["packages/dibs", "plugins/pi", "plugins/opencode"];
 if ((await $`git status --porcelain`.text()).trim()) throw new Error("commit or stash your changes first");
-const { version } = JSON.parse(await readFile("package.json", "utf8"));
-for (const f of [...dirs.slice(1).map((d) => `${d}/package.json`), "jsr.json"]) {
+const { version } = JSON.parse(await readFile("packages/dibs/package.json", "utf8"));
+for (const f of [...dirs.slice(1).map((d) => `${d}/package.json`), "packages/dibs/jsr.json"]) {
 	const v = JSON.parse(await readFile(f, "utf8")).version;
 	if (v !== version) throw new Error(`${f} version ${v} does not match ${version}`);
 }
@@ -56,6 +56,9 @@ for (const dir of dirs) {
 
 // Only core goes to JSR: Pi and opencode install plugins from npm, and JSR can't resolve their host-provided imports.
 // JSR has no dist-tags, but it never resolves a bare import to a prerelease, so dev versions are safe there.
-const jsr = JSON.parse(await readFile("jsr.json", "utf8"));
+const jsr = JSON.parse(await readFile("packages/dibs/jsr.json", "utf8"));
 if (await jsrLive(jsr.name, version)) console.log(`jsr ${jsr.name}@${version}: already published, skipping`);
-else await $`nub dlx jsr publish ${jsrToken ? ["--token", jsrToken] : []}`;
+else {
+	await $`cp README.md CHANGELOG.md LICENSE packages/dibs/`; // JSR does not run prepack
+	await $`nub dlx jsr publish ${jsrToken ? ["--token", jsrToken] : []}`.cwd("packages/dibs");
+}

@@ -12,7 +12,7 @@ Syncs the dibs store with [Things 3](https://culturedcode.com/things/) on macOS.
 
 Hidden input saves the token to `~/.dibs/adapters/things.json` with `0600` permissions, never to a `config.json` that may be committed. `DIBS_THINGS_TOKEN` overrides the file. Missing credentials leave connection setup pending. A valid token shape and successful read do not authenticate the token for writes.
 
-The Pi `/todos connect things <token>` helper remains backward compatible, but private `init` input is recommended. Run `/reload` in Pi after configuration changes. Sync explicitly with `dibs sync` when ready; see the [setup reference](../../../../README.md#init-and-doctor) for consent and read-only doctor checks.
+The Pi `/todos connect things <token>` helper remains backward compatible, but private `init` input is recommended. Run `/reload` in Pi after configuration changes. Sync explicitly with `dibs sync` when ready; see the [setup reference](../../../../../../README.md#init-and-doctor) for consent and read-only doctor checks.
 
 To disconnect, set `"sync": false` or remove the entry, and delete `~/.dibs/adapters/things.json`. Tasks already synced stay on both sides.
 
@@ -29,7 +29,7 @@ Each dibs project syncs with the Things project of the same name (the project fo
 | Description → notes | yes | yes |
 | Completed (and un-completed) | yes | yes |
 
-- Two-way, on the schedule in the [main README](../../../../README.md#adapters). Per field, dibs copies across a change made on one side since the last sync, and dibs wins when both sides changed the field.
+- Two-way, on the schedule in the [main README](../../../../../../README.md#adapters). Per field, dibs copies across a change made on one side since the last sync, and dibs wins when both sides changed the field.
 - Changes made in Things reach dibs on the next sync.
 - State: links and last-synced copies live in `sync/things.jsonl` next to the store's `config.json`.
 

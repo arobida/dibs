@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, expect, test } from "vitest";
 
-const script = resolve("scripts/release.ts");
+const script = resolve("../../scripts/release.ts");
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 
@@ -15,8 +15,8 @@ function fixture() {
 	git("init", "-q");
 	git("config", "user.email", "test@example.com");
 	git("config", "user.name", "Test");
-	for (const d of [".", "agents/pi", "agents/opencode"]) { mkdirSync(join(dir, d), { recursive: true }); writeFileSync(join(dir, d, "package.json"), JSON.stringify({ name: `test-${d}`, version: "1.0.0" })); }
-	writeFileSync(join(dir, "jsr.json"), JSON.stringify({ name: "@test/package", version: "1.0.0" }));
+	for (const d of ["packages/dibs", "plugins/pi", "plugins/opencode"]) { mkdirSync(join(dir, d), { recursive: true }); writeFileSync(join(dir, d, "package.json"), JSON.stringify({ name: `test-${d}`, version: "1.0.0" })); }
+	writeFileSync(join(dir, "packages/dibs/jsr.json"), JSON.stringify({ name: "@test/package", version: "1.0.0" }));
 	git("add", ".");
 	git("commit", "-qm", "test");
 	return { dir, git, run: (...args: string[]) => spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8" }) };
@@ -24,7 +24,7 @@ function fixture() {
 
 test("release rejects packages out of lockstep", () => {
 	const { dir, git, run } = fixture();
-	writeFileSync(join(dir, "agents/pi/package.json"), JSON.stringify({ name: "pi", version: "0.9.0" }));
+	writeFileSync(join(dir, "plugins/pi/package.json"), JSON.stringify({ name: "pi", version: "0.9.0" }));
 	git("commit", "-qam", "drift");
 	expect(run().stderr).toContain("does not match 1.0.0");
 });

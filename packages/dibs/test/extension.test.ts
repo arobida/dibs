@@ -5,7 +5,7 @@ import { existsSync, readFileSync as rfs } from "node:fs";
 vi.mock("@earendil-works/pi-tui", () => ({ truncateToWidth: (text: string) => text, Text: class { t = ""; setText(t: string) { this.t = t; } render() { return [this.t]; } } }));
 vi.mock("@earendil-works/pi-coding-agent", () => ({ getAgentDir: () => process.env.PI_CODING_AGENT_DIR || `${process.env.HOME}/.pi/agent` }));
 process.env.DIBS_HOME = (await import("node:fs")).mkdtempSync(`${(await import("node:os")).tmpdir()}/dibs-home-`);
-const { default: extension } = await import("../agents/pi/index.ts");
+const { default: extension } = await import("../../../plugins/pi/index.ts");
 
 const regTools: Record<string, any> = {};
 const toolFor: Record<string, [string, any?]> = { list: ["todo_list"], ready: ["todo_list", { ready: true }], create: ["todo_create"], edit: ["todo_edit"], start: ["todo_status", { status: "started" }], complete: ["todo_status", { status: "completed" }], link: ["todo_link"], resolve: ["todo_resolve"] };
@@ -44,11 +44,11 @@ test("shows the above-editor task panel even when there are no tasks", async () 
 });
 
 test("manifest exposes the source and host packages remain peers", async () => {
- const pkg = JSON.parse(rfs(new URL("../agents/pi/package.json", import.meta.url), "utf8"));
+ const pkg = JSON.parse(rfs(new URL("../../../plugins/pi/package.json", import.meta.url), "utf8"));
  expect(pkg.pi.extensions).toEqual(["./index.ts"]);
  expect(pkg.keywords).toContain("pi-package");
  expect(Object.keys(pkg.dependencies).sort()).toEqual(["@dibs.ai/dibs"]);
- expect(existsSync(new URL("../agents/pi/index.ts", import.meta.url))).toBe(true);
+ expect(existsSync(new URL("../../../plugins/pi/index.ts", import.meta.url))).toBe(true);
 });
 
 
@@ -322,7 +322,7 @@ test("config.json is JSONC, reading never rewrites $schema", async () => {
  const { readConfig, schemaUrl } = await import("../src/core/store.ts");
  const dir = mkdtempSync(join(tmpdir(), "dibs-jsonc-"));
 		const { version } = JSON.parse(readFileSync("package.json", "utf8"));
-		expect(schemaUrl.endsWith(`/v${version}/schema.json`)).toBe(true);
+		expect(schemaUrl.endsWith(`/v${version}/packages/dibs/schema.json`)).toBe(true);
  // Comments, trailing commas and "//" inside strings; an old $schema is left as written.
  writeFileSync(join(dir, "config.json"), '{\n  "$schema": "https://x/v0.0.1/schema.json", // old\n  /* note */ "file": "~/a//b.jsonl",\n}\n');
  expect(readConfig(dir)).toMatchObject({ file: "~/a//b.jsonl" });

@@ -17,9 +17,9 @@
       },
       "source": "./",
       "strict": false,
-      "mcpServers": "./agents/claude-code/.mcp.json",
+      "mcpServers": "./plugins/claude-code/.mcp.json",
       "skills": [
-        "./agents/shared/skills/"
+        "./packages/dibs/skills/"
       ]
     }
   ]

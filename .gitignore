@@ -3,3 +3,6 @@ node_modules/
 .DS_Store
 dist/
 lib/
+packages/dibs/README.md
+packages/dibs/CHANGELOG.md
+packages/dibs/LICENSE

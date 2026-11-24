@@ -7,7 +7,7 @@ vi.mock("@earendil-works/pi-tui", () => ({ truncateToWidth: (t: string) => t, Te
 vi.mock("@earendil-works/pi-coding-agent", () => ({ getAgentDir: () => `${process.env.HOME}/.pi/agent` }));
 process.env.DIBS_HOME = mkdtempSync(join(tmpdir(), "dibs-home-"));
 const { toolArgs } = await import("../src/core/tools.ts");
-const { default: extension } = await import("../agents/pi/index.ts");
+const { default: extension } = await import("../../../plugins/pi/index.ts");
 
 const o = { creator: "me-agent", claim: "c1", user: async () => "octo" };
 

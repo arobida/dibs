@@ -45,6 +45,6 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/arobida/dibs.git",
-    "directory": "agents/pi"
+    "directory": "plugins/pi"
   }
 }

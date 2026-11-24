@@ -1,0 +1,79 @@
+{
+  "name": "@dibs.ai/dibs",
+  "version": "0.1.8-dev.0",
+  "description": "Shared task store for coding agents: CLI, MCP server and todo.txt, with plugins for Claude Code, opencode, Pi, Codex and Cursor.",
+  "type": "module",
+  "keywords": [
+    "dibs",
+    "ai-agents",
+    "coding-agent",
+    "task-manager",
+    "todo",
+    "todo.txt",
+    "mcp",
+    "mcp-server",
+    "claude-code",
+    "claude-code-plugin",
+    "opencode",
+    "opencode-plugin",
+    "pi-package",
+    "pi",
+    "codex",
+    "cursor",
+    "dex",
+    "things"
+  ],
+  "bin": {
+    "dibs": "./lib/cli/index.js"
+  },
+  "files": [
+    "lib/",
+    "skills/",
+    "src/core/adapters/*/*.schema.json",
+    "schema.json",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "nub run build",
+    "prepack": "cp ../../README.md ../../CHANGELOG.md ../../LICENSE .",
+    "pack:check": "nub pack --dry-run"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "arobida",
+    "url": "https://github.com/arobida"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arobida/dibs.git",
+    "directory": "packages/dibs"
+  },
+  "homepage": "https://github.com/arobida/dibs#readme",
+  "bugs": {
+    "url": "https://github.com/arobida/dibs/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/core/tasks.d.ts",
+      "default": "./lib/core/tasks.js"
+    },
+    "./core/*.ts": {
+      "types": "./lib/core/*.d.ts",
+      "default": "./lib/core/*.js"
+    }
+  }
+}

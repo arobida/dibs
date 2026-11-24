@@ -1,5 +1,5 @@
 -- UI tests for the dibs task panels: drives real agent TUIs in a throwaway Rex session.
--- Usage: nub run test:ui   (builds first), or: rex do test/e2e/panel.lua [agent=pi|claude|opencode]
+-- Usage: nub run test:ui   (builds first), or: rex do packages/dibs/test/e2e/panel.lua [agent=pi|claude|opencode]
 -- Needs Rex and the agent CLIs on PATH.
 -- No prompts are sent, so no model tokens are spent; only the panel UI is exercised.
 -- Claude's panel reads tasks through the plugin's MCP server; the other panels read this checkout's core directly.
@@ -18,7 +18,7 @@ local root = sh({ "git", "rev-parse", "--show-toplevel" })
 -- Each agent: how to start it with the local plugin, the slash command that switches to the project view, and whether the panel reloads on its own.
 local agents = {
   pi = {
-    cmd = 'exec pi --no-session -ne -e "$ROOT/agents/pi/index.ts"',
+    cmd = 'exec pi --no-session -ne -e "$ROOT/plugins/pi/index.ts"',
     project = "/todos project",
     live = true,
   },
@@ -46,7 +46,7 @@ local agents = {
       sh({ "mkdir", "-p", dir .. "/xdg/opencode" })
       local f = assert(io.open(dir .. "/xdg/opencode/cli.json", "w"))
       -- The directory, not plugin/tui.tsx: opencode 2.3.2 ignores a file path here.
-      f:write(rex.json.encode({ plugins = { root .. "/agents/opencode" } }))
+      f:write(rex.json.encode({ plugins = { root .. "/plugins/opencode" } }))
       f:close()
     end,
     -- --standalone: the shared background service would use the user's config instead.
@@ -93,7 +93,7 @@ local function run_body(name, a, sid)
   -- "dibs" on PATH is this checkout, so CLI-driven panels test local code, not npm.
   sh({ "mkdir", dir .. "/bin" })
   local shim = assert(io.open(dir .. "/bin/dibs", "w"))
-  shim:write('#!/bin/sh\necho "$*" >> "' .. dir .. '/shim.log"\nexec node "' .. root .. '/lib/cli/index.js" "$@"\n')
+  shim:write('#!/bin/sh\necho "$*" >> "' .. dir .. '/shim.log"\nexec node "' .. root .. '/packages/dibs/lib/cli/index.js" "$@"\n')
   shim:close()
   sh({ "chmod", "+x", dir .. "/bin/dibs" })
   -- DIBS_HOME keeps the user's global store and adapters (Dex, Things) out of the test.

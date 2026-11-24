@@ -35,9 +35,9 @@ A live task panel (views `current`/`project`/`completed`, like the Pi panel) app
 The panel is a TUI-only plugin, so add it to `cli.json` (docs: https://opencode.ai/docs/cli/plugins):
 
 ```json
-{ "plugins": ["/absolute/path/to/dibs/agents/opencode"] }
+{ "plugins": ["/absolute/path/to/dibs/plugins/opencode"] }
 ```
 
-opencode 2.3.2 loads the directory entry (its `package.json` exports `./tui`) and ignores a path to `plugin/tui.tsx`. From a checkout, run `nub install` at the repo root, which links the `@dibs.ai/dibs` dependency, then install the peers: `cd agents/opencode && nub add @opencode/plugin @opentui/core @opentui/solid solid-js`.
+opencode 2.3.2 loads the directory entry (its `package.json` exports `./tui`) and ignores a path to `plugin/tui.tsx`. From a checkout, run `nub install` at the repo root, which links the `@dibs.ai/dibs` dependency, then install the peers: `cd plugins/opencode && nub add @opencode/plugin @opentui/core @opentui/solid solid-js`.
 
-Keys: `ctrl+shift+v` cycles the view, `ctrl+shift+t` collapses (also `/tasks-view`, `/tasks-toggle`, and the command palette). The panel also refreshes after any event mentioning a `todo_*` tool. It reads the store in-process with the dibs core (`@dibs.ai/dibs`, a dependency in `agents/opencode/package.json`), using the same trust rules as the CLI: `DIBS_TRUST=1` or a folder with `.dibs/`. It does not run `dibs` or `npx`. `nub run test:ui` checks the panel, `/tasks-view` and the refresh on opencode 2.3.2; the `ctrl+shift` keys are not tested.
+Keys: `ctrl+shift+v` cycles the view, `ctrl+shift+t` collapses (also `/tasks-view`, `/tasks-toggle`, and the command palette). The panel also refreshes after any event mentioning a `todo_*` tool. It reads the store in-process with the dibs core (`@dibs.ai/dibs`, a dependency in `plugins/opencode/package.json`), using the same trust rules as the CLI: `DIBS_TRUST=1` or a folder with `.dibs/`. It does not run `dibs` or `npx`. `nub run test:ui` checks the panel, `/tasks-view` and the refresh on opencode 2.3.2; the `ctrl+shift` keys are not tested.
