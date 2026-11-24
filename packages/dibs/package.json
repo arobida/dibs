@@ -1,6 +1,6 @@
 {
   "name": "@dibs.ai/dibs",
-  "version": "0.1.8-dev.0",
+  "version": "0.1.8-dev.1",
   "description": "Shared task store for coding agents: CLI, MCP server and todo.txt, with plugins for Claude Code, opencode, Pi, Codex and Cursor.",
   "type": "module",
   "keywords": [
