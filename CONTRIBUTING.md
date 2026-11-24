@@ -91,7 +91,7 @@ Test a dev release with `npm install @dibs.ai/dibs@dev` (or `@dibs.ai/pi@dev`, `
 
 If publishing fails, stay on the release commit and run `nub run release`. It requires a clean tree, matching versions in every package, and a `v<version>` tag that points to HEAD and matches `origin`; a stable version must also be the tip of `origin/main`. It skips registry versions already live. A failed push can be retried with `git push --atomic origin HEAD refs/tags/v<version>` before running the release command.
 
-JSR has no stored login. Set `JSR_TOKEN` when running the bump or release command. Alternatively, save a JSR token in the macOS Keychain with `security add-generic-password -U -a "$USER" -s jsr-token -w`, then retry with `nub run release --jsr`.
+JSR has no stored login. Save a JSR token in the macOS Keychain with `security add-generic-password -U -a "$USER" -s jsr-token -w`; `bump` reads it from there. `JSR_TOKEN` overrides the Keychain. To retry a release by hand, run `nub run release --jsr`.
 
 Configs point `$schema` at `https://raw.githubusercontent.com/arobida/dibs/v<version>/schema.json` ([`src/core/store.ts`](src/core/store.ts)), the release tag, so that URL returns 404 until the tag is pushed.
 

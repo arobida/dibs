@@ -36,4 +36,5 @@ await $`git add ${files}`;
 await $`git commit -m ${`Release v${version}`} -- ${files}`;
 await $`git tag -a v${version} -m v${version}`;
 await $`git push --atomic origin HEAD ${`refs/tags/v${version}`}`;
-await $`nub scripts/release.ts`;
+// --jsr reads the JSR token from the Keychain when JSR_TOKEN is unset
+await $`nub scripts/release.ts --jsr`;
