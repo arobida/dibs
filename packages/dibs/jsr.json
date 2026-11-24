@@ -1,6 +1,6 @@
 {
   "name": "@dibs/dibs",
-  "version": "0.1.8-dev.1",
+  "version": "0.1.8-dev.2",
   "exports": {
     ".": "./src/core/tasks.ts"
   },
