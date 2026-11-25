@@ -41,3 +41,17 @@ test("complete on a live session-claimed task needs --force", async () => {
 	expect(run("codex", "complete", id).code).toBe(1);
 	expect(run("codex", "complete", id, "--force").code).toBe(0);
 });
+
+test("start refuses a task with an open blocker unless forced", () => {
+	run("codex", "create", "Blocker");
+	const a = idOf("Blocker");
+	run("codex", "create", "Blocked", "--blocked-by", a);
+	const b = idOf("Blocked");
+	const refused = run("codex", "start", b);
+	expect(refused.code).toBe(1);
+	expect(refused.err).toContain(a);
+	expect(run("codex", "start", b, "--force").code).toBe(0);
+	run("codex", "create", "Blocked2", "--blocked-by", a);
+	run("codex", "start", a); run("codex", "complete", a);
+	expect(run("codex", "start", idOf("Blocked2")).code).toBe(0);
+});

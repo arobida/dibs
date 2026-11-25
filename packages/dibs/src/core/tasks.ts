@@ -143,6 +143,8 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 		const claim = option("--claim"), owner = found.claimed_by;
 		// shortcut: a reused pid keeps a claim looking live until --force or release; upgrade by storing a process start time.
 		if ((action === "start" || action === "complete") && owner && owner !== claim && live(found) && !option("--force")) throw new Error(`Task ${value} is claimed by ${owner}; pass force to override`);
+		const open = action === "start" && !option("--force") ? (found.blocked_by ?? []).filter((b) => items.find((i) => i.id === b)?.completed === false) : [];
+		if (open.length) throw new Error(`Task ${value} is blocked by open task(s) ${open.join(", ")}; finish them first or pass force to override`);
 		if (action === "start") { task.started_at = new Date().toISOString(); if (claim) task.claimed_by = claim; }
 		else if (action === "complete") { task.claimed_by = undefined; task.completed = true; task.completed_date ||= today(); task.result = option("--result"); }
 		else if (action === "edit") { if (option("--name") !== undefined) task.name = option("--name")!; if (option("--description") !== undefined) task.description = option("--description"); if (option("--human") !== undefined) task.human = option("--human"); if (option("--blocked-by") !== undefined) { task.blocked_by = ids(option("--blocked-by"))?.map((b) => findId(items, b, file)); checkBlockers(items, task.id, task.blocked_by); } }
