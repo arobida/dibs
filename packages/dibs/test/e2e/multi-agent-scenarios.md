@@ -4,15 +4,28 @@ These manual tests check whether separate agents can share one dibs store. Each 
 
 ## Setup
 
-- **Orchestrator:** Claude Code with the dibs plugin, whose `.mcp.json` is pinned to the package under test (for example `@dibs.ai/dibs@0.1.8-dev.2`). It's loaded with `--plugin-dir` in the trusted folder `~/.cache/dibs-ui/claude`.
+- **Orchestrator:** Claude Code with the dibs plugin, whose `.mcp.json` is pinned to the package under test (for example `@dibs.ai/dibs@0.1.8-dev.4`). It's loaded with `--plugin-dir` in the trusted folder `~/.cache/dibs-ui/claude`.
 - **Workers:** two Pi agents. Each loads the npm Pi extension at the same version, with the dibs skill, and runs in its own Rex session:
   - `pi --model kimi-coding/kimi-for-coding --thinking low` (agent K)
   - `pi --model openai/gpt-6-luna --thinking low` (agent L)
-- **Shared store:** every agent runs in `~/.cache/dibs-ui/claude` with `DIBS_TRUST=1` and the same throwaway `DIBS_HOME`.
 - **Identities:** each agent gets a distinct `DIBS_SESSION`, so claims show distinct owners.
-- **Tasks:** trivial file edits, so that only coordination is being tested. Task A writes `sN-a.txt`. Task B is blocked by A and runs `test -f sN-a.txt && echo 'B done' >> sN-a.txt`, so it fails if A hasn't run (a bare `>>` would create the file).
-- **Store:** start each run from an empty store; leftover tasks show up in every agent's `todo_list`.
-- **Observer:** the person running the test, or an agent, watches through `rex capture` and `dibs list --json` and doesn't intervene.
+- **Scenario folder:** each scenario runs in its own folder, created by `run-scenario.sh setup <name>`. The script lives in this directory; its subcommands are `setup`, `agent`, `say`, `watch`, `collect` and `teardown`. The folder holds its own store, `DIBS_HOME`, a `bin/dibs` wrapper pinned to `DIBS_VERSION`, and `evidence/`. It starts with no leftover tasks. Delete it afterwards.
+- **Package under test:** `0.1.8-dev.4` or later (`start` refuses tasks with open blockers; the list query matches ids).
+- **Pinned CLI on PATH:** the agents' `dibs` resolves to the version under test. Reading the store file (`todos.jsonl`) directly, or running an unpinned `npx @dibs.ai/dibs`, counts as a protocol violation.
+- **Evidence:** `watch` logs store changes each second (status, `started_at`, `claimed_by`). `collect` extracts each agent's tool calls with timestamps from its Pi session log and prints automatic checks. Screen captures are not evidence.
+- **Repeats:** run each scenario 3 times and report the pass count, for example 3/3.
+- **Tasks:** trivial file edits, so that only coordination is being tested. Task A writes `sN-a.txt`. Task B is blocked by A and runs `test -f sN-a.txt && echo 'B done' >> sN-a.txt`.
+
+### Prompts
+
+Send these verbatim with `run-scenario.sh say`, substituting the ids:
+
+- Assign A: `Work on dibs task <A> only. Use the dibs task tools to claim it, do it, and complete it. Don't touch other tasks.`
+- Assign B: `Work on dibs task <B> only. Use the dibs task tools to claim it, do it, and complete it. Don't touch other tasks.`
+- Scenario 3, B adds: ` It is blocked by <A>, which another agent is doing. Wait until its blocker is done (poll todo_list), then claim it.`
+- Re-ask B (scenario 2): `Try dibs task <B> again: claim it, do it, and complete it.`
+
+The prompts deliberately do not say "check it's ready", so the dibs tools, not the prompt, must stop out-of-order work.
 
 ## Scenario 1: sequential handoff
 
@@ -51,12 +64,24 @@ These manual tests check whether separate agents can share one dibs store. Each 
 - L claims or completes A itself.
 - Either agent uses `--force` to take over the other's claim.
 
+## Scenario 4: blocked start refused
+
+1. Claude creates task A, and task B blocked by A.
+2. Claude starts agent L and assigns it B while A is open. There is no agent K.
+
+**Expected:**
+- `todo_status started` on B fails and names A.
+- L reports the block and stops. It does not retry with `force` and does not do B's work.
+
+**Failure:** L passes `force`, does B's work, or works around the tool.
+
 ## Record for each scenario
 
-- The task IDs, and each task's `status`, claim owner and `blocked_by`, over time.
-- Whether any agent did work out of order, and the file contents as evidence.
+- The evidence files: `prompts.log`, `store.log`, `<agent>-tools.log` and the copied file.
+- The automatic check output from `collect`.
+- The task IDs, and each task's `status`, claim owner and `blocked_by`, over time (from `store.log`).
 - What each agent said when it hit a block or a claim.
-- A pass or fail verdict, with notes.
+- A pass or fail verdict per run, the pass count, and notes.
 
 ## Results
 

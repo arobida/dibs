@@ -109,6 +109,7 @@ test("short prefixed ids, prefix lookup, list query", async () => {
 	expect(await rf(file, ["start", short])).toContain(a);
 	expect(() => rf(file, ["list", "--query", "zz"])).not.toThrow();
 	expect(JSON.parse(await rf(file, ["list", "--query", "LINK"]) as string).map((t: any) => t.id)).toEqual([a]);
+	expect(JSON.parse(await rf(file, ["list", "--query", b]) as string).map((t: any) => t.id)).toEqual([b]);
 	await expect(rf(file, ["start", "mypr-"])).rejects.toThrow("Ambiguous task id");
 	await expect(rf(file, ["start", "zzz"])).rejects.toThrow("Task not found: zzz");
 });

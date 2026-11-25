@@ -107,7 +107,7 @@ export default function taskPanel(pi: ExtensionAPI) {
 		async execute(_id, params, signal, _onUpdate, ctx) { return { content: [{ type: "text", text: await act(action, { ...(params as object) }, signal, ctx) }], details: {} }; },
 	});
 	tool("todo_list", "List tasks as a JSON array. ready: true lists only open, unclaimed, unblocked tasks. Ids are short and project-prefixed (e.g. proj-a1b2c3).", Type.Object({
-		query: Type.Optional(Type.String({ description: "Case-insensitive text to match in task name or description" })),
+		query: Type.Optional(Type.String({ description: "Case-insensitive text to match in task id, name or description" })),
 		ready: Type.Optional(Type.Boolean({ description: "Only tasks ready to work on" })),
 		human: Type.Optional(Type.String({ description: "Only tasks for this GitHub user; \"me\" for the current user" })),
 	}));

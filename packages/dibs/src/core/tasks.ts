@@ -77,7 +77,7 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 	if (action === "list") {
 		const q = args.includes("--query") ? args[args.indexOf("--query") + 1]?.toLowerCase() : undefined;
 		const h = args.includes("--human") ? args[args.indexOf("--human") + 1] : undefined;
-		return JSON.stringify(items.filter((t) => (!q || `${t.name}\n${t.description ?? ""}`.toLowerCase().includes(q)) && (h === undefined || t.human === h)));
+		return JSON.stringify(items.filter((t) => (!q || `${t.id}\n${t.name}\n${t.description ?? ""}`.toLowerCase().includes(q)) && (h === undefined || t.human === h)));
 	}
 	if (action === "ready") return JSON.stringify(items.filter((t) => (!args.includes("--human") || t.human === args[args.indexOf("--human") + 1]) && !t.completed && !live(t) && (t.blocked_by ?? []).every((b) => items.find((i) => i.id === b)?.completed ?? true)));
 	const save = () => { const temp = `${file}.${randomUUID()}.tmp`; writeFileSync(temp, items.map((task) => JSON.stringify(clean(task)) + "\n").join(""), { mode: 0o600 }); renameSync(temp, file); };

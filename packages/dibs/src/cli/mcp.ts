@@ -37,7 +37,7 @@ const tool = (name: string, description: string, inputSchema: z.ZodRawShape) => 
 	catch (e: any) { return { content: [{ type: "text" as const, text: e.message ?? String(e) }], isError: true }; }
 });
 tool("todo_list", "List tasks as a JSON array. ready: true lists only open, unclaimed, unblocked tasks. Ids are short and project-prefixed (e.g. proj-a1b2c3).", {
-	query: z.string().optional().describe("Case-insensitive text to match in task name or description"),
+	query: z.string().optional().describe("Case-insensitive text to match in task id, name or description"),
 	ready: z.boolean().optional().describe("Only tasks ready to work on"),
 	human: z.string().optional().describe("Only tasks for this GitHub user; \"me\" for the current user"),
 });
