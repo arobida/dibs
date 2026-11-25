@@ -12,7 +12,7 @@ export async function toolArgs(action: string, params: Record<string, any>, o: {
 	if (name !== undefined) checkName(name);
 	let args: string[];
 	if (action === "list") args = [...(p.ready ? ["ready"] : ["list", ...(query?.trim() ? ["--query", query] : [])]), ...(human ? ["--human", human] : [])];
-	else if (action === "create") args = ["create", name, ...(description !== undefined ? ["--description", description] : []), ...(parent ? ["--parent", parent] : []), ...(blocked_by !== undefined ? ["--blocked-by", blocked_by] : []), "--created-by", o.creator, "--human", await o.user() ?? ""];
+	else if (action === "create") args = ["create", name, ...(description !== undefined ? ["--description", description] : []), ...(parent ? ["--parent", parent] : []), ...(blocked_by !== undefined ? ["--blocked-by", blocked_by] : []), "--created-by", o.creator, "--claim", o.claim, "--human", await o.user() ?? ""];
 	else if (action === "edit") args = ["edit", id, ...(name !== undefined ? ["--name", name] : []), ...(description !== undefined ? ["--description", description] : []), ...(blocked_by !== undefined ? ["--blocked-by", blocked_by] : []), ...(human !== undefined ? ["--human", human] : [])];
 	else if (p.status === "completed") args = ["complete", id, "--result", result || "Completed", "--claim", o.claim];
 	else if (result !== undefined) throw new Error("result is only for status completed");

@@ -40,6 +40,8 @@ function checkBlockers(items: Task[], id: string, blockers: string[] = []) {
 }
 // The CLI process exits right after start, so its pid can't prove liveness; cli: claims last until complete or --force.
 const live = (task: Task) => !!task.claimed_by && (task.claimed_by.startsWith("cli:") || isAlive(Number(task.claimed_by.split(":").pop())));
+// Pi claims end in :pid; drop it so a restarted session is still the same creator.
+const session = (c: string) => (c.startsWith("cli:") ? c : c.replace(/:\d+$/, ""));
 const ids = (s?: string) => (s ? s.split(",").map((x) => x.trim()).filter(Boolean) : undefined);
 // Short project-prefixed ids (like Dex/Beads) so agents copy a few characters, not a UUID.
 const prefix = (file: string) => (basename(file).replace(/\.todos\.jsonl$/, "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 4) || "task");
@@ -131,7 +133,7 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 	if (action === "create") {
 		const parent = option("--parent") && findId(items, option("--parent")!, file);
 		checkParent(items, "", parent);
-		task = { id: newId(file, items), name: value, completed: false, created: today(), started_at: null, description: option("--description"), parent, created_by: option("--created-by"), human: option("--human"), blocked_by: ids(option("--blocked-by"))?.map((b) => findId(items, b, file)) };
+		task = { id: newId(file, items), name: value, completed: false, created: today(), started_at: null, description: option("--description"), parent, created_session: option("--claim"), created_by: option("--created-by"), human: option("--human"), blocked_by: ids(option("--blocked-by"))?.map((b) => findId(items, b, file)) };
 		checkBlockers(items, task.id, task.blocked_by);
 	} else {
 		const ref = findId(items, value, file);
@@ -142,9 +144,12 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 		var before = JSON.stringify([found.name, found.description ?? "", found.blocked_by ?? [], found.human ?? ""]);
 		const claim = option("--claim"), owner = found.claimed_by;
 		// shortcut: a reused pid keeps a claim looking live until --force or release; upgrade by storing a process start time.
-		if ((action === "start" || action === "complete") && owner && owner !== claim && live(found) && !option("--force")) throw new Error(`Task ${value} is claimed by ${owner}; pass force to override`);
-		const open = action === "start" && !option("--force") ? (found.blocked_by ?? []).filter((b) => items.find((i) => i.id === b)?.completed === false) : [];
-		if (open.length) throw new Error(`Task ${value} is blocked by open task(s) ${open.join(", ")}; finish them first or pass force to override`);
+		// Forcing is the delegator's call: only the creating session may (tasks with no recorded creator: anyone).
+		const force = !!option("--force") && (!found.created_session || session(found.created_session) === session(claim ?? ""));
+		const why = option("--force") && !force ? `; only its creator (${found.created_session}) may force it` : "";
+		if ((action === "start" || action === "complete") && owner && owner !== claim && live(found) && !force) throw new Error(`Task ${value} is claimed by ${owner}${why}`);
+		const open = action === "start" ? (found.blocked_by ?? []).filter((b) => items.find((i) => i.id === b)?.completed === false) : [];
+		if (open.length && !force) throw new Error(`Task ${value} is blocked by open task(s) ${open.join(", ")}; finish them first${why}`);
 		if (action === "start") { task.started_at = new Date().toISOString(); if (claim) task.claimed_by = claim; }
 		else if (action === "complete") { task.claimed_by = undefined; task.completed = true; task.completed_date ||= today(); task.result = option("--result"); }
 		else if (action === "edit") { if (option("--name") !== undefined) task.name = option("--name")!; if (option("--description") !== undefined) task.description = option("--description"); if (option("--human") !== undefined) task.human = option("--human"); if (option("--blocked-by") !== undefined) { task.blocked_by = ids(option("--blocked-by"))?.map((b) => findId(items, b, file)); checkBlockers(items, task.id, task.blocked_by); } }

@@ -129,7 +129,7 @@ export default function taskPanel(pi: ExtensionAPI) {
 		id: Id,
 		status: Type.Union([Type.Literal("started"), Type.Literal("completed")]),
 		result: Type.Optional(Type.String({ description: "Only with completed: what was done (default: Completed)" })),
-		force: Type.Optional(Type.Boolean({ description: "Override another live session's claim, or start despite open blockers" })),
+		force: Type.Optional(Type.Boolean({ description: "Only for the session that created the task: override another live session's claim, or start despite open blockers" })),
 	}));
 	tool("todo_link", "Get a Markdown dibs:// link to a task, for use in notes or other projects.", Type.Object({ id: Id }));
 	tool("todo_resolve", "Read the task behind a dibs:// link, from any project.", Type.Object({ url: Type.String({ description: "A dibs://<project-id>/<task-id> link" }) }));

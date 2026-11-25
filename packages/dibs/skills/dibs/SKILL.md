@@ -54,7 +54,7 @@ If Things sync is enabled in config, run `dibs sync` before reading tasks and af
 - If `dibs` is not on your PATH, run `npx -y @dibs.ai/dibs` in its place (e.g. `npx -y @dibs.ai/dibs list`).
 - Ids accept a unique prefix: `dibs start a1b` works when only one id starts with `a1b`.
 - Keep the name short. Put details, context, and acceptance criteria in `--description`.
-- Run `start` before you begin a task. A started task stays claimed until `complete`. `start` refuses a task while any of its blockers is open. `--force` overrides both the block and another agent's claim; use it only when that agent is gone or the user asks.
+- Run `start` before you begin a task. A started task stays claimed until `complete`. `start` refuses a task while any of its blockers is open. `--force` overrides another agent's claim or an open block, and only the session that created the task may use it. If you didn't create the task, report the claim or block and stop.
 - Run `complete --result "..."` when the task is done. The result states what changed, in one line.
 - `ready` lists unblocked work. Pick from it before starting anything else.
 - `list` and `ready` print one line per task. Add `--json` for machine-readable output.

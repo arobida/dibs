@@ -361,7 +361,7 @@ test("store records are validated; bad imports write nothing", async () => {
  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("session_shutdown releases claims; force overrides a live claim; link and resolve work", async () => {
+test("session_shutdown releases claims; the creator may force over a live claim; link and resolve work", async () => {
  const { mkdtempSync, rmSync } = await import("node:fs");
  const { tmpdir } = await import("node:os");
  const { join } = await import("node:path");
@@ -375,12 +375,12 @@ test("session_shutdown releases claims; force overrides a live claim; link and r
   const ctxFor = (id: string) => ({ cwd, hasUI: false, isProjectTrusted: () => true, ui: { notify() {} }, sessionManager: { getSessionId: () => id } });
   const [a, b] = [ctxFor("A"), ctxFor("B")];
   const run = async (ctx: any, params: any) => (await tool.execute("call", params, undefined, undefined, ctx)).content[0].text;
-  const id = (await run(a, { action: "create", name: "shared" })).match(/Created task (\S+)/)![1];
+  const id = (await run(b, { action: "create", name: "shared" })).match(/Created task (\S+)/)![1];
   await run(a, { action: "start", id });
-  await expect(run(b, { action: "start", id })).rejects.toThrow("pass force to override");
-  await run(b, { action: "start", id, force: true });
+  await expect(run(b, { action: "start", id })).rejects.toThrow("claimed by");
+  await run(b, { action: "start", id, force: true }); // b created it, so b may force
   await handlers.session_shutdown({}, a);
-  await expect(run(a, { action: "start", id })).rejects.toThrow("claimed by");
+  await expect(run(a, { action: "start", id, force: true })).rejects.toThrow("only its creator");
   await handlers.session_shutdown({}, b);
   await run(a, { action: "start", id });
   const ready = JSON.parse(await run(b, { action: "ready" }));

@@ -44,7 +44,7 @@ collect)
     f=$(ls -t $ROOT/agents/$name-pi/**/*.jsonl 2>/dev/null | head -1 || true)
     [[ -z $f ]] && { echo "no pi log for $name"; continue; }
     logs+=$f
-    jq -r 'select(.type=="message") | .timestamp as $t | .message as $m | ($m.content // [])[] |
+    jq -r 'select(.type=="message") | .timestamp as $t | .message as $m | (if ($m.content|type)=="string" then [{text:$m.content}] else ($m.content // []) end)[] |
       "\($t) \($m.role) " + (if .name then "tool \(.name) \(.arguments|tostring)" else (.text // "") end | gsub("\n";" ") | .[0:300])' $f > $E/$name-tools.log
   done
   ok() { if eval "$1"; then echo "PASS: $2"; else echo "FAIL: $2"; fi; }

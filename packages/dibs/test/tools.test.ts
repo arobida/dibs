@@ -17,7 +17,7 @@ test("edit with only human \"\" clears the assignee", async () => {
 test("empty description on create is dropped; human is the current user", async () => {
 	const a = await toolArgs("create", { name: "n", description: "" }, o);
 	expect(a).not.toContain("--description");
-	expect(a).toEqual(["create", "n", "--created-by", "me-agent", "--human", "octo"]);
+	expect(a).toEqual(["create", "n", "--created-by", "me-agent", "--claim", "c1", "--human", "octo"]);
 });
 test("human me resolves via user()", async () => {
 	expect(await toolArgs("list", { human: "me" }, o)).toEqual(["list", "--human", "octo"]);

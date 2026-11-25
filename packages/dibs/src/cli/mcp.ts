@@ -58,7 +58,7 @@ tool("todo_status", "Start or complete a task. Starting claims it for this sessi
 	id: Id,
 	status: z.enum(["started", "completed"]),
 	result: z.string().optional().describe("Only with completed: what was done (default: Completed)"),
-	force: z.boolean().optional().describe("Override another live session's claim, or start despite open blockers"),
+	force: z.boolean().optional().describe("Only for the session that created the task: override another live session's claim, or start despite open blockers"),
 });
 tool("todo_link", "Get a Markdown dibs:// link to a task, for use in notes or other projects.", { id: Id });
 tool("todo_resolve", "Read the task behind a dibs:// link, from any project.", { url: z.string().describe("A dibs://<project-id>/<task-id> link") });

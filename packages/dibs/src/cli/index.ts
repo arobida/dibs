@@ -112,7 +112,7 @@ try {
 		const who = v.human === "me" ? await ghUser(ctx) ?? (() => { throw new Error("Cannot resolve --human me: set DIBS_USER or git config github.user"); })() : v.human;
 		if (cmd === "list") args = ["list", ...opt("query"), ...(who === undefined ? [] : ["--human", who])];
 		else if (cmd === "ready") args = ["ready", ...(who === undefined ? [] : ["--human", who])];
-		else if (cmd === "create") { checkName(need()); args = ["create", arg, ...opt("description"), ...opt("parent"), ...opt("blocked-by"), "--created-by", agentName(), "--human", who ?? await ghUser(ctx) ?? ""]; }
+		else if (cmd === "create") { checkName(need()); args = ["create", arg, ...opt("description"), ...opt("parent"), ...opt("blocked-by"), "--created-by", agentName(), "--claim", cliClaim, "--human", who ?? await ghUser(ctx) ?? ""]; }
 		else if (cmd === "edit") {
 			if (!v.name && v.description === undefined && v["blocked-by"] === undefined && v.human === undefined) throw new Error("edit needs --name, --description, --blocked-by or --human");
 			args = ["edit", need(), ...opt("name"), ...opt("description"), ...opt("blocked-by"), ...(who === undefined ? [] : ["--human", who])];

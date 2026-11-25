@@ -13,13 +13,14 @@ export interface Task {
 	parent?: string;
 	result?: string;
 	claimed_by?: string; // "<sessionId>:<pid>"; local only, never synced
+	created_session?: string; // claim of the session that created it; only it may force past blockers
 	created_by?: string; // agent name (pi, claude-code, cli, ...) or "@user" when a human created it
 	human?: string; // GitHub username (no @) of the human in the loop
 	blocked_by?: string[]; // ids of tasks that must complete first; local only
 }
 
 const date = /^\d{4}-\d{2}-\d{2}$/;
-const optional = ["priority", "created", "completed_date", "description", "parent", "result", "claimed_by", "created_by", "human"] as const;
+const optional = ["priority", "created", "completed_date", "description", "parent", "result", "claimed_by", "created_session", "created_by", "human"] as const;
 
 // Validates a parsed JSONL record and returns it as a Task; unknown keys are rejected so typos never pass silently.
 export function toTask(record: any): Task {
@@ -37,7 +38,7 @@ export function toTask(record: any): Task {
 }
 
 // Drops empty optional fields and writes keys in schema order, so records stay minimal and stable.
-const order = ["id", "name", "completed", "priority", "created", "completed_date", "started_at", "description", "parent", "result", "claimed_by", "created_by", "human", "blocked_by"];
+const order = ["id", "name", "completed", "priority", "created", "completed_date", "started_at", "description", "parent", "result", "claimed_by", "created_session", "created_by", "human", "blocked_by"];
 export const clean = (task: Task): Task => Object.fromEntries(Object.entries(task).sort(([a], [b]) => order.indexOf(a) - order.indexOf(b)).filter(([key, value]) => value !== undefined && (value !== "" || key === "name") && !(Array.isArray(value) && !value.length))) as Task;
 
 export function parseTodo(line: string): Task {

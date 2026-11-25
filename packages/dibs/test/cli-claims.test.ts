@@ -24,7 +24,11 @@ test("a CLI start claim keeps the task out of ready; other agents need --force",
 	expect(run("codex", "start", id).code).toBe(0);
 	expect(run("codex", "ready").out).not.toContain(id);
 	expect(run("cursor", "start", id).code).toBe(1);
-	expect(run("cursor", "start", id, "--force").code).toBe(0);
+	expect(run("cursor", "start", id, "--force").code).toBe(1); // only the creator may force
+	run("cursor", "create", "T2");
+	const t2 = idOf("T2");
+	run("codex", "start", t2);
+	expect(run("cursor", "start", t2, "--force").code).toBe(0);
 });
 
 test("the owner completes its own CLI-claimed task", () => {
@@ -50,6 +54,9 @@ test("start refuses a task with an open blocker unless forced", () => {
 	const refused = run("codex", "start", b);
 	expect(refused.code).toBe(1);
 	expect(refused.err).toContain(a);
+	const other = run("cursor", "start", b, "--force");
+	expect(other.code).toBe(1); // only the creator may force past a blocker
+	expect(other.err).toContain("only its creator (cli:codex)");
 	expect(run("codex", "start", b, "--force").code).toBe(0);
 	run("codex", "create", "Blocked2", "--blocked-by", a);
 	run("codex", "start", a); run("codex", "complete", a);
