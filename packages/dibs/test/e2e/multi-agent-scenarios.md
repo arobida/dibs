@@ -111,6 +111,7 @@ Agents get their work from a `dibs://` link in a shared Markdown file instead of
 - The task IDs, and each task's `status`, claim owner and `blocked_by`, over time (from `store.log`).
 - What each agent said when it hit a block or a claim.
 - A pass or fail verdict per run, the pass count if it was repeated, and notes.
+- Any result caused by the test infrastructure (`run-scenario.sh`, Rex, Pi, the models' providers) rather than by the agents or dibs. Put it in a callout directly under the report title, starting with `> **⚠️ INFRA ISSUE:**`, and mark each affected check line with `(INFRA)`. The callout must say what broke, which checks it affects, and whether the verdict still holds.
 
 ## Results
 
