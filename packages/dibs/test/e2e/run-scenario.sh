@@ -11,7 +11,14 @@ case $cmd in
 setup)
   [[ -e $ROOT ]] && { echo "exists: $ROOT" >&2; exit 1; }
   mkdir -p $ROOT/{home,bin,evidence,work,agents}
-  (cd $ROOT && npm i --silent --prefix pkg @dibs.ai/dibs@${DIBS_VERSION:?set DIBS_VERSION} @dibs.ai/pi@$DIBS_VERSION)
+  if [[ ${DIBS_VERSION:?set DIBS_VERSION (or local)} == local ]]; then
+    # Build and pack this checkout; packing rewrites workspace:* so Pi gets the local core, not the registry one.
+    repo=${0:A:h:h:h:h:h}; (cd $repo && nub run build >/dev/null)
+    for d in packages/dibs plugins/pi; do (cd $repo/$d && nub pack --pack-destination $ROOT/tgz >/dev/null); done
+    (cd $ROOT && npm i --silent --prefix pkg $ROOT/tgz/*.tgz)
+  else
+    (cd $ROOT && npm i --silent --prefix pkg @dibs.ai/dibs@$DIBS_VERSION @dibs.ai/pi@$DIBS_VERSION)
+  fi
   ln -s $ROOT/pkg/node_modules/.bin/dibs $ROOT/bin/dibs
   printf 'export DIBS_TRUST=1 DIBS_HOME=%s\nexport PATH=%s/bin:$PATH\n' $ROOT/home $ROOT > $ROOT/env.sh
   mk() { DIBS_SESSION=orchestrator pdibs create "$@" | sed -E 's/^Created task ([^ ]+).*/\1/'; }
@@ -55,7 +62,13 @@ collect)
   if [[ -z $ta || -z $bs ]]; then echo "UNKNOWN: B.started_at > A completion (A=${ta:-?} B=${bs:-?})"
   else ok '[[ $bs > $ta ]]' "B.started_at $bs > A completed $ta"; fi
   ok '! grep -qE "force\\\\?\":true|--force" $E/*-tools.log /dev/null' "no force usage"
-  ok '! grep -qE "tool .*(todos\\.jsonl|npx)" $E/*-tools.log /dev/null' "no todos.jsonl / npx in tool calls" ;;
+  ok '! grep -qE "tool .*(todos\\.jsonl|npx)" $E/*-tools.log /dev/null' "no todos.jsonl / npx in tool calls"
+  if [[ -f $W/plan.md ]]; then  # scenario 5: task links in a Markdown file
+    cp $W/plan.md $E/
+    ok 'grep -qE "\]\(dibs://[^/]+/$B\)" $W/plan.md' "plan.md has a Markdown dibs:// link to B"
+    ok '[[ $(grep -cE "tool todo_resolve .*dibs://" $E/*-tools.log /dev/null | awk -F: "{s+=\$NF} END {print s}") -ge 2 ]]' "todo_resolve called on a dibs:// link at least twice"
+    ok 'grep -qE "tool todo_link " $E/*-tools.log /dev/null' "todo_link used to write the link"
+  fi ;;
 teardown)
   for f in $ROOT/agents/*(.); do [[ $f == *.start ]] || rex kill ${$(<$f)%% *}; done ;;
 *) echo "unknown cmd $cmd" >&2; exit 1 ;;
