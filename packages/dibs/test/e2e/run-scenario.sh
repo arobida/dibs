@@ -44,6 +44,8 @@ watch)
     sleep 1
   done ;;
 collect)
+  . $ROOT/ids
+  {
   cp $W/$N-a.txt $E/ 2>/dev/null || true
   logs=()
   for m in $ROOT/agents/*.start; do
@@ -55,7 +57,6 @@ collect)
       "\($t) \($m.role) " + (if .name then "tool \(.name) \(.arguments|tostring)" else (.text // "") end | gsub("\n";" ") | .[0:300])' $f > $E/$name-tools.log
   done
   ok() { if eval "$1"; then echo "PASS: $2"; else echo "FAIL: $2"; fi; }
-  . $ROOT/ids
   ok '[[ "$(cat $W/$N-a.txt 2>/dev/null)" == $'"'"'A done\nB done'"'"' ]]' "final file is exactly 'A done\\nB done\\n'"
   ta=$(grep -m1 "\"id\":\"$A\"[^}]*\"completed\":true" $E/store.log 2>/dev/null | cut -d' ' -f1 || true)
   bs=$(pdibs --json list 2>/dev/null | jq -r ".[]|select(.id==\"$B\")|.started_at // empty" 2>/dev/null || true)
@@ -68,7 +69,13 @@ collect)
     ok 'grep -qE "\]\(dibs://[^/]+/$B\)" $W/plan.md' "plan.md has a Markdown dibs:// link to B"
     ok '[[ $(grep -cE "tool todo_resolve .*dibs://" $E/*-tools.log /dev/null | awk -F: "{s+=\$NF} END {print s}") -ge 2 ]]' "todo_resolve called on a dibs:// link at least twice"
     ok 'grep -qE "tool todo_link " $E/*-tools.log /dev/null' "todo_link used to write the link"
-  fi ;;
+  fi
+  } | tee $E/checks.txt
+  # Dated report with the evidence inline; verdict and notes are added by hand.
+  rep=${0:A:h}/results/$(date -u +%Y-%m-%dT%H%M%SZ)-$N.md; mkdir -p ${rep:h}
+  { echo "# Scenario $N, $(date -u +%F)"; echo; echo "Package: \`$(jq -r .version $ROOT/pkg/node_modules/@dibs.ai/dibs/package.json)\`. Tasks: A \`$A\`, B \`$B\`."; echo; echo "Verdict: _fill in_"
+    for f in checks.txt prompts.log store.log *-tools.log $N-a.txt plan.md; do [[ -f $E/$f ]] && printf '\n## %s\n\n```text\n%s\n```\n' $f "$(<$E/$f)"; done
+  } > $rep; echo "report: $rep" ;;
 teardown)
   for f in $ROOT/agents/*(.); do [[ $f == *.start ]] || rex kill ${$(<$f)%% *}; done ;;
 *) echo "unknown cmd $cmd" >&2; exit 1 ;;
