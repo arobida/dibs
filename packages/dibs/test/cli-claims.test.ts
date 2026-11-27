@@ -62,3 +62,17 @@ test("start refuses a task with an open blocker unless forced", () => {
 	run("codex", "start", a); run("codex", "complete", a);
 	expect(run("codex", "start", idOf("Blocked2")).code).toBe(0);
 });
+
+test("a non-creator's --force is refused even when nothing needs forcing", () => {
+	run("codex", "create", "Free task");
+	const id = idOf("Free task");
+	const other = run("cursor", "start", id, "--force");
+	expect(other.code).toBe(1);
+	expect(other.err).toContain("--force refused");
+	expect(run("cursor", "start", id).code).toBe(0); // the same start without force succeeds
+	run("codex", "create", "Free task 2");
+	const t2 = idOf("Free task 2");
+	const own = run("codex", "start", t2, "--force"); // creator's force with nothing to override
+	expect(own.code).toBe(0);
+	expect(own.out).not.toContain("(forced)");
+});

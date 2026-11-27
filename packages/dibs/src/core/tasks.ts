@@ -130,6 +130,7 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 	}
 	let task: Task;
 	let index = items.length;
+	let forced = false;
 	if (action === "create") {
 		const parent = option("--parent") && findId(items, option("--parent")!, file);
 		checkParent(items, "", parent);
@@ -146,10 +147,13 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 		// shortcut: a reused pid keeps a claim looking live until --force or release; upgrade by storing a process start time.
 		// Forcing is the delegator's call: only the creating session may (tasks with no recorded creator: anyone).
 		const force = !!option("--force") && (!found.created_session || session(found.created_session) === session(claim ?? ""));
-		const why = option("--force") && !force ? `; only its creator (${found.created_session}) may force it` : "";
-		if ((action === "start" || action === "complete") && owner && owner !== claim && live(found) && !force) throw new Error(`Task ${value} is claimed by ${owner}${why}`);
+		// Refuse a force the caller may not use even when nothing needs forcing, so the agent learns not to reach for it.
+		if (option("--force") && !force) throw new Error(`Task ${value}: --force refused; only its creator (${found.created_session}) may force it. Retry without force, and if the task is blocked or claimed, report that and stop.`);
+		const claimed = (action === "start" || action === "complete") && !!owner && owner !== claim && live(found);
+		if (claimed && !force) throw new Error(`Task ${value} is claimed by ${owner}`);
 		const open = action === "start" ? (found.blocked_by ?? []).filter((b) => items.find((i) => i.id === b)?.completed === false) : [];
-		if (open.length && !force) throw new Error(`Task ${value} is blocked by open task(s) ${open.join(", ")}; finish them first${why}`);
+		if (open.length && !force) throw new Error(`Task ${value} is blocked by open task(s) ${open.join(", ")}; finish them first`);
+		forced = force && (claimed || open.length > 0);
 		if (action === "start") { task.started_at = new Date().toISOString(); if (claim) task.claimed_by = claim; }
 		else if (action === "complete") { task.claimed_by = undefined; task.completed = true; task.completed_date ||= today(); task.result = option("--result"); }
 		else if (action === "edit") { if (option("--name") !== undefined) task.name = option("--name")!; if (option("--description") !== undefined) task.description = option("--description"); if (option("--human") !== undefined) task.human = option("--human"); if (option("--blocked-by") !== undefined) { task.blocked_by = ids(option("--blocked-by"))?.map((b) => findId(items, b, file)); checkBlockers(items, task.id, task.blocked_by); } }
@@ -162,7 +166,7 @@ export function runFile(file: string, args: string[]): string | Promise<string> 
 	const what = `task ${task.id} "${task.name}"`, blockers = task.blocked_by?.length ? `; blocked by ${task.blocked_by.join(", ")}` : "";
 	const desc = task.description ? `; description: "${task.description}"` : "; no description";
 	if (action === "create") return `Created ${what}${desc}${task.parent ? `; parent ${task.parent}` : ""}${blockers}`;
-	if (action === "start") return `Started ${what}${option("--claim") ? "; claimed by this session" : ""}${option("--force") ? " (forced)" : ""}`;
+	if (action === "start") return `Started ${what}${option("--claim") ? "; claimed by this session" : ""}${forced ? " (forced)" : ""}`;
 	if (action === "complete") return `Completed ${what}; ${task.result ? `result: ${task.result}` : "no result"}`;
 	const after = [task.name, task.description ?? "", task.blocked_by ?? [], task.human ?? ""], was = JSON.parse(before!);
 	const changed = ["name", "description", "blocked_by", "human"].filter((_, i) => JSON.stringify(after[i]) !== JSON.stringify(was[i]));
